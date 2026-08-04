@@ -732,54 +732,94 @@ function populateInvoiceForPrint(log) {
 }
 
 // ==========================================
-// INVENTORY TAB
+// INVENTORY TAB — CARD GRID
 // ==========================================
 function renderInventory() {
     const searchVal = document.getElementById('inventory-search').value.toLowerCase();
     const brandVal  = document.getElementById('inventory-filter-brand').value;
-    const tbody     = document.getElementById('inventory-table-body');
-    tbody.innerHTML = '';
+    const grid      = document.getElementById('inventory-cards-grid');
+    grid.innerHTML  = '';
 
     const filtered = products.filter(p => {
         const matchSearch = p.name.toLowerCase().includes(searchVal) || p.brand.toLowerCase().includes(searchVal);
-        const matchBrand  = brandVal === 'all' ? true : brandVal === 'Other' ? !brands.some(b => b.toLowerCase() === p.brand.toLowerCase()) : p.brand === brandVal;
+        const matchBrand  = brandVal === 'all' ? true
+            : brandVal === 'Other' ? !brands.some(b => b.toLowerCase() === p.brand.toLowerCase())
+            : p.brand === brandVal;
         return matchSearch && matchBrand;
     });
 
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding:40px;color:var(--text-muted);">
-            <i data-lucide="package-x" style="width:32px;height:32px;display:block;margin:0 auto 10px;"></i>
-            No products found. ${products.length === 0 ? 'Click "Add Stock Lot" or "Add New Product" to get started!' : ''}
-        </td></tr>`;
-        lucide.createIcons(); return;
+        grid.innerHTML = `
+            <div class="empty-cart-placeholder" style="grid-column:1/-1;">
+                <i data-lucide="package-x"></i>
+                <p>${products.length === 0 ? 'No products yet. Click "Add Stock Lot" or "Add New Product" to get started!' : 'No products match your filter.'}</p>
+            </div>`;
+        lucide.createIcons();
+        return;
     }
 
     filtered.forEach(p => {
-        let badge = `<span class="badge badge-success">In Stock</span>`;
-        if (p.stock === 0)                 badge = `<span class="badge badge-danger">Out of Stock</span>`;
-        else if (p.stock <= p.alertLevel)  badge = `<span class="badge badge-warning">Low Stock</span>`;
+        const margin = p.buyingPrice > 0 ? ((p.sellingPrice - p.buyingPrice) / p.sellingPrice * 100) : 0;
 
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td><strong>${p.name}</strong></td>
-            <td><span class="badge badge-secondary">${p.brand}</span></td>
-            <td class="text-right">LKR ${p.buyingPrice.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-            <td class="text-right">LKR ${p.sellingPrice.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-            <td class="text-right"><strong>${p.stock}</strong></td>
-            <td class="text-center">${p.alertLevel}</td>
-            <td>${badge}</td>
-            <td class="text-center">
-                <div class="table-row-actions">
-                    <button class="btn-icon edit-prod-btn"   data-id="${p.id}" title="Edit"><i data-lucide="edit"></i></button>
-                    <button class="btn-icon delete-prod-btn delete-action" data-id="${p.id}" title="Delete"><i data-lucide="trash-2"></i></button>
+        let statusBadgeTxt = 'In Stock';
+        let statusBadgeCls = 'in-stock';
+        let stockColor     = '';
+        if (p.stock === 0)                { statusBadgeTxt = 'Out of Stock'; statusBadgeCls = 'out-stock'; stockColor = 'color:var(--danger);'; }
+        else if (p.stock <= p.alertLevel) { statusBadgeTxt = 'Low Stock';    statusBadgeCls = 'low-stock'; stockColor = 'color:var(--warning);'; }
+
+        let brandBadgeCls = p.brand.toLowerCase() === 'sigiri' ? 'sigiri'
+            : p.brand.toLowerCase() === 'rhino' ? 'rhino' : 'other';
+
+        const card = document.createElement('div');
+        card.className = 'inv-card';
+        card.innerHTML = `
+            <span class="inv-card-brand card-brand-badge ${brandBadgeCls}">${p.brand}</span>
+            <h4>${p.name}</h4>
+
+            <div class="inv-card-prices">
+                <div class="inv-price-row">
+                    <span class="label">Buying cost</span>
+                    <span class="value">LKR ${p.buyingPrice.toLocaleString('en-US',{minimumFractionDigits:2})}</span>
                 </div>
-            </td>`;
-        tbody.appendChild(tr);
-        tr.querySelector('.edit-prod-btn').addEventListener('click', () => editProductModal(p.id));
-        tr.querySelector('.delete-prod-btn').addEventListener('click', () => deleteProduct(p.id));
+                <div class="inv-price-row">
+                    <span class="label">Selling price</span>
+                    <span class="value sell">LKR ${p.sellingPrice.toLocaleString('en-US',{minimumFractionDigits:2})}</span>
+                </div>
+                <div class="inv-price-row" style="border-top:1px dashed var(--border);padding-top:4px;margin-top:2px;">
+                    <span class="label">Profit margin</span>
+                    <span class="value profit">${margin.toFixed(1)}%</span>
+                </div>
+            </div>
+
+            <div class="inv-stock-row">
+                <div>
+                    <div class="inv-stock-count" style="${stockColor}">${p.stock}</div>
+                    <div class="inv-stock-label">sheets in stock</div>
+                </div>
+                <div style="text-align:right;">
+                    <span class="stock-indicator-badge ${statusBadgeCls}">${statusBadgeTxt}</span>
+                    <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">Alert at ${p.alertLevel}</div>
+                </div>
+            </div>
+
+            <div class="inv-card-actions">
+                <button class="inv-edit-btn" data-id="${p.id}">
+                    <i data-lucide="edit-3"></i> Edit
+                </button>
+                <button class="inv-delete-btn" data-id="${p.id}">
+                    <i data-lucide="trash-2"></i> Delete
+                </button>
+            </div>`;
+
+        grid.appendChild(card);
+
+        card.querySelector('.inv-edit-btn').addEventListener('click', () => editProductModal(p.id));
+        card.querySelector('.inv-delete-btn').addEventListener('click', () => deleteProduct(p.id));
     });
+
     lucide.createIcons();
 }
+
 
 function editProductModal(productId) {
     const prod = products.find(p => p.id === productId);

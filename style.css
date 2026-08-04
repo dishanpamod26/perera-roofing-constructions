@@ -708,6 +708,146 @@ h1, h2, h3, h4, h5, h6 {
     cursor: not-allowed;
 }
 
+/* ── Inventory Card Grid ── */
+.inventory-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 18px;
+    padding: 24px;
+    align-content: start;
+}
+
+.inv-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 18px 16px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+    transition: var(--transition);
+    overflow: hidden;
+}
+
+.inv-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary-light);
+}
+
+.inv-card-brand {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.inv-card h4 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--primary);
+    margin-right: 56px;
+    line-height: 1.3;
+}
+
+.inv-card-prices {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: var(--primary-ultra-light);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+}
+
+.inv-price-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11.5px;
+}
+
+.inv-price-row .label { color: var(--text-muted); }
+.inv-price-row .value { font-weight: 700; color: var(--text-primary); }
+.inv-price-row .value.sell { color: var(--primary); font-size: 13px; }
+.inv-price-row .value.profit { color: var(--success); }
+
+.inv-stock-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.inv-stock-count {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--primary);
+    line-height: 1;
+}
+
+.inv-stock-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.inv-card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.inv-edit-btn {
+    background: var(--primary-ultra-light);
+    color: var(--primary);
+    border: none;
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-heading);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    transition: var(--transition);
+}
+
+.inv-edit-btn:hover {
+    background: var(--primary);
+    color: #fff;
+}
+
+.inv-delete-btn {
+    background: var(--danger-light);
+    color: var(--danger);
+    border: none;
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-heading);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    transition: var(--transition);
+}
+
+.inv-delete-btn:hover {
+    background: var(--danger);
+    color: #fff;
+}
+
 /* Quotation Pane */
 .quotation-panel {
     background-color: var(--bg-card);
