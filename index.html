@@ -101,6 +101,14 @@
                                 <span class="kpi-trend text-muted">Buying cost value</span>
                             </div>
                         </div>
+                        <div class="kpi-card text-secondary">
+                            <div class="kpi-icon-wrapper blue"><i data-lucide="truck"></i></div>
+                            <div class="kpi-data">
+                                <h3>Other Costs (Transport)</h3>
+                                <p id="kpi-transport-cost" class="kpi-val">LKR 0.00</p>
+                                <span class="kpi-trend text-muted">Total transport/delivery cost</span>
+                            </div>
+                        </div>
                         <div class="kpi-card text-success">
                             <div class="kpi-icon-wrapper crimson"><i data-lucide="award"></i></div>
                             <div class="kpi-data">
@@ -240,13 +248,10 @@
                                 <div id="summary-customer-view" class="summary-view-content active">
                                     <div class="summary-line"><span>Subtotal:</span><span id="cust-subtotal">LKR 0.00</span></div>
                                     <div class="summary-line">
-                                        <span>Extra Discount:</span>
-                                        <div class="discount-input-group">
-                                            <input type="number" id="extra-discount-val" value="0" min="0" placeholder="0">
-                                            <select id="extra-discount-type">
-                                                <option value="cash">LKR</option>
-                                                <option value="percent">%</option>
-                                            </select>
+                                        <span>Transport Cost:</span>
+                                        <div class="price-input-wrapper" style="width: 140px;">
+                                            <span class="currency-label" style="padding: 4px 6px; font-size:11px;">LKR</span>
+                                            <input type="number" id="transport-cost-val" value="0" min="0" placeholder="0" style="padding-left:45px; height:34px; width:100%; border:1px solid var(--border); border-radius:var(--radius-md);">
                                         </div>
                                     </div>
                                     <hr class="summary-divider">
@@ -259,6 +264,7 @@
                                     <div class="summary-line"><span>Total Buying Cost:</span><span id="int-total-cost">LKR 0.00</span></div>
                                     <div class="summary-line"><span>Subtotal (Selling):</span><span id="int-subtotal">LKR 0.00</span></div>
                                     <div class="summary-line"><span>Total Discount Given:</span><span id="int-discount" class="text-crimson">LKR 0.00</span></div>
+                                    <div class="summary-line"><span>Transport Cost:</span><span id="int-transport-cost">LKR 0.00</span></div>
                                     <hr class="summary-divider">
                                     <div class="summary-line profit-line"><span>Net Profit:</span><span id="int-net-profit" class="text-success-highlight">LKR 0.00</span></div>
                                     <div class="summary-line margin-line"><span>Profit Margin:</span><span id="int-profit-margin" class="badge badge-success">0%</span></div>
@@ -299,6 +305,14 @@
                                     <small class="form-help">Total cost paid for this stock lot (giya wiyadama)</small>
                                 </div>
                                 <div class="form-group">
+                                    <label for="se-transport-cost">Transport Cost (LKR)</label>
+                                    <div class="price-input-wrapper">
+                                        <span class="currency-label">LKR</span>
+                                        <input type="number" id="se-transport-cost" min="0" step="0.01" placeholder="0.00" value="0">
+                                    </div>
+                                    <small class="form-help">Transport/delivery cost for this stock lot (loading/unloading/transport)</small>
+                                </div>
+                                <div class="form-group">
                                     <label for="se-note">Note (Optional)</label>
                                     <input type="text" id="se-note" placeholder="e.g., Lot No. 3, Supplier: ABC...">
                                 </div>
@@ -326,6 +340,9 @@
                                     </div>
                                     <div class="se-preview-row">
                                         <span>Stock Number:</span><strong id="se-prev-stock-num">—</strong>
+                                    </div>
+                                    <div class="se-preview-row">
+                                        <span>Transport Cost:</span><strong id="se-prev-transport">—</strong>
                                     </div>
                                     <div class="se-preview-row highlight">
                                         <span>Total Cost Paid:</span><strong id="se-prev-total">LKR 0.00</strong>
@@ -362,7 +379,7 @@
                 <section id="inventory" class="tab-pane">
                     <div class="action-header">
                         <div class="inventory-filters">
-                            <div class="search-bar">
+                             <div class="search-bar">
                                 <i data-lucide="search"></i>
                                 <input type="text" id="inventory-search" placeholder="Search inventory...">
                             </div>
@@ -379,6 +396,9 @@
                         <div style="display:flex;gap:8px;flex-wrap:wrap;">
                             <button id="download-inventory-csv-btn" class="btn-secondary" style="padding:10px 16px;">
                                 <i data-lucide="file-spreadsheet"></i> Export CSV
+                            </button>
+                            <button id="inventory-add-brand-btn" class="btn-secondary" style="padding:10px 16px;">
+                                <i data-lucide="plus"></i> Add Brand
                             </button>
                             <button id="add-product-btn" class="btn-primary">
                                 <i data-lucide="plus-circle"></i> Add New Product
@@ -538,9 +558,10 @@
                 <button class="modal-close" id="close-lot-modal">&times;</button>
             </div>
             <div class="modal-body">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: var(--text-secondary); background: var(--primary-ultra-light); padding: 10px 14px; border-radius: var(--radius-md);">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: var(--text-secondary); background: var(--primary-ultra-light); padding: 10px 14px; border-radius: var(--radius-md); flex-wrap: wrap; gap: 8px;">
                     <div><strong>Date Logged:</strong> <span id="modal-lot-date"></span></div>
                     <div><strong>Total Cost Paid:</strong> <strong id="modal-lot-cost" class="text-navy"></strong></div>
+                    <div><strong>Transport Cost:</strong> <strong id="modal-lot-transport" class="text-warning"></strong></div>
                     <div><strong>Status:</strong> <span id="modal-lot-status-badge"></span></div>
                 </div>
                 <div style="margin-bottom: 16px; font-size: 13px; color: var(--text-secondary); padding: 0 14px;">
@@ -574,7 +595,8 @@
                     <div class="invoice-company-details">
                         <h1>PERERA ROOFING &amp; CONSTRUCTIONS</h1>
                         <p class="tagline">BUILDING STRONG. BUILDING TRUST.</p>
-                        <p class="contact">Roofing Sheet Specialists &amp; Construction Contractors</p>
+                        <p class="address" style="margin-bottom: 4px; font-weight: 600;">Temple Road, Ambalangoda, Polgasowita</p>
+                        <p class="contact" style="font-weight: 600; color: var(--navy);">Tel: 077 698 8109 / 070 102 8284 | Roofing Sheet Specialists &amp; Construction Contractors</p>
                     </div>
                 </div>
                 <div class="invoice-meta">
@@ -604,6 +626,10 @@
                     <tr id="print-discount-row" style="display:none;">
                         <td colspan="5" class="text-right text-crimson">Discount</td>
                         <td class="text-right text-crimson" id="print-discount">- LKR 0.00</td>
+                    </tr>
+                    <tr id="print-transport-row" style="display:none;">
+                        <td colspan="5" class="text-right">Transport Cost</td>
+                        <td class="text-right" id="print-transport">LKR 0.00</td>
                     </tr>
                     <tr class="invoice-total-row">
                         <td colspan="5" class="text-right"><strong>TOTAL</strong></td>

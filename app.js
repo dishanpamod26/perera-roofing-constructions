@@ -13,6 +13,7 @@ let products  = JSON.parse(localStorage.getItem('pr_products'))    || [];
 let salesLogs = JSON.parse(localStorage.getItem('pr_sales_logs'))  || [];
 let stockLogs = JSON.parse(localStorage.getItem('pr_stock_logs'))  || [];
 let brands    = JSON.parse(localStorage.getItem('pr_brands'))      || ['Sigiri', 'Rhino'];
+let customSizes = JSON.parse(localStorage.getItem('pr_custom_sizes')) || [];
 let cart      = [];
 let activeChart = null;
 
@@ -39,8 +40,39 @@ function showToast(msg, type = 'success') {
 // ============================================================
 // HELPERS
 // ============================================================
+function getAllSizes() {
+    let list = [...SHEET_SIZES];
+    customSizes.forEach(cs => {
+        if (!list.some(item => item.value === cs.value)) {
+            list.push(cs);
+        }
+    });
+    return list;
+}
+
+function renderSizeFiltersAndDropdowns() {
+    // 1. Inventory size filter dropdown
+    const invSize = document.getElementById('inventory-filter-size');
+    if (invSize) {
+        const prev = invSize.value || 'all';
+        invSize.innerHTML = `<option value="all">All Sizes</option>` +
+            getAllSizes().map(s => `<option value="${s.value}">${s.label}</option>`).join('');
+        if (invSize.querySelector(`option[value="${prev}"]`)) invSize.value = prev;
+    }
+
+    // 2. Product Modal size dropdown
+    const prodSize = document.getElementById('product-size-val');
+    if (prodSize) {
+        const prev = prodSize.value;
+        prodSize.innerHTML = `<option value="" disabled selected>-- Select Size --</option>` +
+            getAllSizes().map(s => `<option value="${s.value}">${s.label}</option>`).join('') +
+            `<option value="custom">Custom / Other</option>`;
+        if (prodSize.querySelector(`option[value="${prev}"]`)) prodSize.value = prev;
+    }
+}
+
 function sizeLabel(val) {
-    const s = SHEET_SIZES.find(s => s.value === val);
+    const s = getAllSizes().find(s => s.value === val);
     return s ? s.label : val || '—';
 }
 
@@ -118,6 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateLiveDate();
     setInterval(updateLiveDate, 60000);
     renderBrandControls();
+    renderSizeFiltersAndDropdowns();
     document.querySelectorAll('.nav-item').forEach(btn => {
         btn.addEventListener('click', e => switchTab(e.currentTarget.getAttribute('data-tab')));
     });
@@ -164,9 +197,8 @@ function setupEventListeners() {
     // Catalog search
     document.getElementById('catalog-search').addEventListener('input', renderCatalog);
 
-    // Extra discount
-    document.getElementById('extra-discount-val').addEventListener('input', calculateCartTotals);
-    document.getElementById('extra-discount-type').addEventListener('change', calculateCartTotals);
+    // Transport cost in quotation
+    document.getElementById('transport-cost-val').addEventListener('input', calculateCartTotals);
 
     // View tabs
     document.querySelectorAll('.view-tab').forEach(tab => {
@@ -181,7 +213,21 @@ function setupEventListeners() {
 
     // Cart actions
     document.getElementById('clear-cart-btn').addEventListener('click', () => {
-        if (cart.length > 0) { cart = []; document.getElementById('extra-discount-val').value = 0; renderCart(); showToast('Cart cleared!', 'info'); }
+        if (cart.length > 0) { cart = []; document.getElementById('transport-cost-val').value = 0; renderCart(); showToast('Cart cleared!', 'info'); }
+    });
+
+    // Inventory quick add brand
+    document.getElementById('inventory-add-brand-btn').addEventListener('click', () => {
+        const raw = prompt('Enter new brand name:');
+        if (!raw || !raw.trim()) return;
+        const clean = raw.trim();
+        if (brands.some(b => b.toLowerCase() === clean.toLowerCase())) { showToast(`Brand "${clean}" already exists!`, 'warning'); return; }
+        brands.push(clean);
+        saveBrands();
+        renderBrandControls();
+        document.getElementById('inventory-filter-brand').value = clean;
+        renderInventory();
+        showToast(`Brand "${clean}" added! Now click "Add New Product" to add items.`);
     });
     document.getElementById('confirm-sale-btn').addEventListener('click', checkoutQuotation);
     document.getElementById('print-invoice-btn').addEventListener('click', triggerInvoicePrint);
@@ -211,6 +257,7 @@ function setupEventListeners() {
         customGroup.style.display = 'none';
         nameInput.required = false;
         renderBrandControls();
+        renderSizeFiltersAndDropdowns();
         productModal.classList.add('active');
     });
 
@@ -314,6 +361,9 @@ function addSeItemRow(brand='', size='', customName='', qty='', weight='') {
     // Brand options
     const brandOpts = brands.map(b => `<option value="${b}" ${b===brand?'selected':''}>${b}</option>`).join('') + `<option value="Other" ${brand==='Other'?'selected':''}>Other</option>`;
     
+    // Size options
+    const sizeOpts = getAllSizes().map(s => `<option value="${s.value}" ${s.value===size?'selected':''}>${s.label}</option>`).join('') + `<option value="custom" ${size==='custom'?'selected':''}>Custom / Other</option>`;
+    
     row.innerHTML = `
         <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 0;">
             <label style="font-size: 11px; margin-bottom: 4px;">Brand *</label>
@@ -326,12 +376,7 @@ function addSeItemRow(brand='', size='', customName='', qty='', weight='') {
             <label style="font-size: 11px; margin-bottom: 4px;">Size *</label>
             <select class="se-item-size" required style="height: 38px; font-size: 13px;">
                 <option value="" disabled ${!size?'selected':''}>-- Size --</option>
-                <option value="6ft" ${size==='6ft'?'selected':''}>6 ft</option>
-                <option value="8ft" ${size==='8ft'?'selected':''}>8 ft</option>
-                <option value="10ft" ${size==='10ft'?'selected':''}>10 ft</option>
-                <option value="12ft" ${size==='12ft'?'selected':''}>12 ft</option>
-                <option value="4x4" ${size==='4x4'?'selected':''}>4 × 4 ft</option>
-                <option value="custom" ${size==='custom'?'selected':''}>Custom / Other</option>
+                ${sizeOpts}
             </select>
         </div>
         <div class="form-group se-item-custom-group" style="display: ${size==='custom'?'block':'none'}; flex: 1.5; min-width: 140px; margin-bottom: 0;">
@@ -387,6 +432,7 @@ function updateStockEntryPreview() {
     const container = document.getElementById('se-items-container');
     const stockNum = document.getElementById('se-stock-number').value.trim() || '—';
     const totalCost = parseFloat(document.getElementById('se-total-cost').value) || 0;
+    const transportCost = parseFloat(document.getElementById('se-transport-cost').value) || 0;
     
     let totalQty = 0;
     let totalItems = 0;
@@ -404,16 +450,19 @@ function updateStockEntryPreview() {
     document.getElementById('se-prev-qty').textContent = `${totalQty} sheet${totalQty===1?'':'s'}`;
     document.getElementById('se-prev-stock-num').textContent = stockNum;
     document.getElementById('se-prev-total').textContent = `LKR ${fmt(totalCost)}`;
+    const transportEl = document.getElementById('se-prev-transport');
+    if (transportEl) transportEl.textContent = transportCost > 0 ? `LKR ${fmt(transportCost)}` : '—';
 }
 
 // ============================================================
 // SAVE STOCK ENTRY → log pending stock lot
 // ============================================================
 function saveStockEntry() {
-    const stockNumber = document.getElementById('se-stock-number').value.trim();
-    const totalCost   = parseFloat(document.getElementById('se-total-cost').value) || 0;
-    const note        = document.getElementById('se-note').value.trim();
-    const container   = document.getElementById('se-items-container');
+    const stockNumber   = document.getElementById('se-stock-number').value.trim();
+    const totalCost     = parseFloat(document.getElementById('se-total-cost').value) || 0;
+    const transportCost = parseFloat(document.getElementById('se-transport-cost').value) || 0;
+    const note          = document.getElementById('se-note').value.trim();
+    const container     = document.getElementById('se-items-container');
     
     if (!stockNumber) { showToast('Please enter a Stock / Lot Number!', 'warning'); return; }
     if (totalCost <= 0) { showToast('Please enter a valid total cost paid!', 'warning'); return; }
@@ -437,8 +486,17 @@ function saveStockEntry() {
         if (sizeVal === 'custom' && !customName) { showToast(`Please enter custom name for row ${index+1}!`, 'warning'); isValid = false; return; }
         if (qty <= 0) { showToast(`Quantity must be greater than 0 for row ${index+1}!`, 'warning'); isValid = false; return; }
         
-        const finalSize = sizeVal === 'custom' ? customName : sizeVal;
+        const finalSize = sizeVal === 'custom' ? customName.toLowerCase().replace(/[^a-z0-9]/g, '-') : sizeVal;
         const displayLabel = sizeVal === 'custom' ? customName : sizeLabel(sizeVal);
+        
+        if (sizeVal === 'custom' && customName) {
+            const cleanVal = customName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+            if (!customSizes.some(s => s.value === cleanVal)) {
+                customSizes.push({ value: cleanVal, label: customName });
+                localStorage.setItem('pr_custom_sizes', JSON.stringify(customSizes));
+                renderSizeFiltersAndDropdowns();
+            }
+        }
         
         items.push({
             id: 'item_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
@@ -466,6 +524,7 @@ function saveStockEntry() {
                 ...stockLogs[existingIdx],
                 stockNumber,
                 totalCost,
+                transportCost,
                 note,
                 items
             };
@@ -479,6 +538,7 @@ function saveStockEntry() {
             timestamp: new Date().toISOString(),
             stockNumber,
             totalCost,
+            transportCost,
             note,
             status: 'pending',
             items
@@ -494,10 +554,12 @@ function saveStockEntry() {
     addSeItemRow(); // Add one default row
     
     document.getElementById('se-total-cost').value = '';
+    document.getElementById('se-transport-cost').value = '';
     document.getElementById('se-prev-items').textContent = '0 types';
     document.getElementById('se-prev-qty').textContent = '0 sheets';
     document.getElementById('se-prev-stock-num').textContent = '—';
     document.getElementById('se-prev-total').textContent = 'LKR 0.00';
+    const tEl = document.getElementById('se-prev-transport'); if (tEl) tEl.textContent = '—';
     
     renderStockHistory(); // Renders the lot card list
     renderDashboard();
@@ -538,6 +600,7 @@ function renderStockHistory() {
             brandSet.add(i.brand);
         });
         const brandsStr = Array.from(brandSet).join(', ');
+        const transport = l.transportCost || 0;
         
         const card = document.createElement('div');
         card.className = 'stock-lot-card';
@@ -555,6 +618,7 @@ function renderStockHistory() {
                 <div><span class="text-muted">Brands:</span> <strong>${brandsStr || '—'}</strong></div>
                 <div><span class="text-muted">Total Qty:</span> <strong>${totalSheets} sheets</strong></div>
                 <div><span class="text-muted">Total Cost Paid:</span> <strong class="text-navy">LKR ${fmt(l.totalCost)}</strong></div>
+                ${transport > 0 ? `<div><span class="text-muted">Transport Cost:</span> <strong style="color:var(--warning);">LKR ${fmt(transport)}</strong></div>` : ''}
                 ${l.note ? `<div style="font-style: italic; font-size:11px; margin-top: 4px; border-left:2px solid var(--border); padding-left: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">"${l.note}"</div>` : ''}
             </div>
             <div class="stock-lot-card-footer">
@@ -613,6 +677,8 @@ function openEditStockLotModal(lotId) {
             item.weight || ''
         );
     });
+    // Restore transport cost
+    document.getElementById('se-transport-cost').value = lot.transportCost || '';
     updateStockEntryPreview();
 
     // Store the editing lot id so save can replace it
@@ -684,6 +750,7 @@ function openStockLotDetailsModal(lotId) {
     const d = new Date(lot.timestamp);
     document.getElementById('modal-lot-date').textContent = d.toLocaleString('en-US', { year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
     document.getElementById('modal-lot-cost').textContent = `LKR ${fmt(lot.totalCost)}`;
+    document.getElementById('modal-lot-transport').textContent = lot.transportCost > 0 ? `LKR ${fmt(lot.transportCost)}` : '—';
     document.getElementById('modal-lot-note').textContent = lot.note || '—';
     
     const badge = document.getElementById('modal-lot-status-badge');
@@ -716,6 +783,7 @@ function openStockLotDetailsModal(lotId) {
                             <span class="currency-label" style="padding: 4px 8px; font-size:12px;">LKR</span>
                             <input type="number" class="item-modal-sell-price" required min="0" step="0.01" value="${item.sellingPrice || ''}" placeholder="0.00" style="height: 34px; font-size: 13px; padding-left: 45px; width: 100%; border: 1px solid var(--border); border-radius: var(--radius-md);">
                         </div>
+                        <div class="price-loss-warning" style="display:none; color:var(--danger); font-size:11px; margin-top:4px; font-weight:600;">⚠️ PADUI! Selling price is below buying price — loss!</div>
                     </div>
                 </div>
             `;
@@ -737,6 +805,21 @@ function openStockLotDetailsModal(lotId) {
             ${inputsHtml}
         `;
         container.appendChild(itemRow);
+
+        // Attach loss-warning listener for pending items
+        if (lot.status === 'pending') {
+            const buyInp  = itemRow.querySelector('.item-modal-buy-price');
+            const sellInp = itemRow.querySelector('.item-modal-sell-price');
+            const warnEl  = itemRow.querySelector('.price-loss-warning');
+            const checkLoss = () => {
+                const b = parseFloat(buyInp.value) || 0;
+                const s = parseFloat(sellInp.value) || 0;
+                if (b > 0 && s > 0 && s < b) warnEl.style.display = 'block';
+                else warnEl.style.display = 'none';
+            };
+            buyInp.addEventListener('input', checkLoss);
+            sellInp.addEventListener('input', checkLoss);
+        }
     });
     
     const footer = document.getElementById('modal-lot-footer');
@@ -794,6 +877,15 @@ function confirmStockLotPrices(e) {
         item.buyingPrice = up.buyingPrice;
         item.sellingPrice = up.sellingPrice;
         
+        // Ensure custom size is saved
+        const isDefaultSize = SHEET_SIZES.some(s => s.value === item.size);
+        if (!isDefaultSize && item.sizeLabel) {
+            const cleanVal = item.size;
+            if (!customSizes.some(s => s.value === cleanVal)) {
+                customSizes.push({ value: cleanVal, label: item.sizeLabel });
+            }
+        }
+        
         let prod = products.find(p => p.brand === item.brand && p.size === item.size);
         if (prod) {
             prod.stock += item.qty;
@@ -818,6 +910,8 @@ function confirmStockLotPrices(e) {
     
     saveProducts();
     saveStockLogs();
+    localStorage.setItem('pr_custom_sizes', JSON.stringify(customSizes));
+    renderSizeFiltersAndDropdowns();
     
     closeStockLotModal();
     
@@ -997,21 +1091,20 @@ function calculateCartTotals() {
         const disc=computeItemDiscount(item);
         subtotal+=line; totalCost+=cost; itemDiscTotal+=disc;
     });
-    const extVal=parseFloat(document.getElementById('extra-discount-val').value)||0;
-    const extType=document.getElementById('extra-discount-type').value;
-    const extDisc=extType==='flat'?extVal:subtotal*(extVal/100);
-    const totalDiscount=itemDiscTotal+extDisc;
-    const grandTotal=Math.max(0,subtotal-totalDiscount);
-    const netProfit=grandTotal-totalCost;
-    const margin=grandTotal>0?(netProfit/grandTotal)*100:0;
+    const transportCost = parseFloat(document.getElementById('transport-cost-val').value) || 0;
+    const totalDiscount = itemDiscTotal;
+    const productTotal  = Math.max(0, subtotal - totalDiscount);   // after discounts
+    const grandTotal    = productTotal + transportCost;             // customer total (products + transport)
+    const netProfit     = productTotal - totalCost;                 // profit on products only (transport is pass-through)
+    const margin        = grandTotal > 0 ? (netProfit / grandTotal) * 100 : 0;
 
     // Customer view
-    const custSub  = document.getElementById('cust-subtotal');
+    const custSub   = document.getElementById('cust-subtotal');
     const custTotal = document.getElementById('cust-grand-total');
     if (custSub)   custSub.textContent   = `LKR ${fmt(subtotal)}`;
     if (custTotal) custTotal.textContent = `LKR ${fmt(grandTotal)}`;
 
-    // Per-item breakdown (customer view)
+    // Per-item breakdown (customer view) — shown when 2+ sheet types
     let breakdownEl = document.getElementById('cart-items-breakdown');
     if (!breakdownEl) {
         breakdownEl = document.createElement('div');
@@ -1037,18 +1130,20 @@ function calculateCartTotals() {
     }
 
     // Internal view
-    const intCost   = document.getElementById('int-total-cost');
-    const intSub    = document.getElementById('int-subtotal');
-    const intDisc   = document.getElementById('int-discount');
-    const intProfit = document.getElementById('int-net-profit');
-    const intMargin = document.getElementById('int-profit-margin');
-    if (intCost)   intCost.textContent   = `LKR ${fmt(totalCost)}`;
-    if (intSub)    intSub.textContent    = `LKR ${fmt(subtotal)}`;
-    if (intDisc)   intDisc.textContent   = `- LKR ${fmt(totalDiscount)}`;
-    if (intProfit) { intProfit.textContent = `LKR ${fmt(netProfit)}`; intProfit.style.color = netProfit >= 0 ? 'var(--success)' : 'var(--secondary)'; }
-    if (intMargin) intMargin.textContent = `${margin.toFixed(1)}%`;
+    const intCost      = document.getElementById('int-total-cost');
+    const intSub       = document.getElementById('int-subtotal');
+    const intDisc      = document.getElementById('int-discount');
+    const intTransport = document.getElementById('int-transport-cost');
+    const intProfit    = document.getElementById('int-net-profit');
+    const intMargin    = document.getElementById('int-profit-margin');
+    if (intCost)      intCost.textContent      = `LKR ${fmt(totalCost)}`;
+    if (intSub)       intSub.textContent       = `LKR ${fmt(subtotal)}`;
+    if (intDisc)      intDisc.textContent      = `- LKR ${fmt(totalDiscount)}`;
+    if (intTransport) intTransport.textContent = transportCost > 0 ? `LKR ${fmt(transportCost)}` : '—';
+    if (intProfit)    { intProfit.textContent = `LKR ${fmt(netProfit)}`; intProfit.style.color = netProfit >= 0 ? 'var(--success)' : 'var(--danger)'; }
+    if (intMargin)    intMargin.textContent    = `${margin.toFixed(1)}%`;
 
-    return { subtotal, totalCost, totalDiscount, grandTotal, netProfit, profitMargin: margin };
+    return { subtotal, totalCost, totalDiscount, transportCost, grandTotal, netProfit, profitMargin: margin };
 }
 
 function checkoutQuotation() {
@@ -1071,7 +1166,7 @@ function checkoutQuotation() {
     saveSales();
     populateInvoiceForPrint({ id:saleId, timestamp:new Date().toISOString(), items:saleItems, totals });
     cart = [];
-    document.getElementById('extra-discount-val').value = 0;
+    document.getElementById('transport-cost-val').value = 0;
     renderCart(); renderCatalog(); renderDashboard();
     showToast(`Sale ${saleId} completed!`, 'success');
     setTimeout(() => window.print(), 400);
@@ -1104,6 +1199,9 @@ function populateInvoiceForPrint(log) {
     const dr = document.getElementById('print-discount-row');
     if (log.totals.totalDiscount > 0) { dr.style.display='table-row'; document.getElementById('print-discount').textContent=`- LKR ${fmt(log.totals.totalDiscount)}`; }
     else dr.style.display = 'none';
+    const tr2 = document.getElementById('print-transport-row');
+    if (log.totals.transportCost > 0) { tr2.style.display='table-row'; document.getElementById('print-transport').textContent=`LKR ${fmt(log.totals.transportCost)}`; }
+    else if (tr2) tr2.style.display = 'none';
     document.getElementById('print-total').innerHTML = `<strong>LKR ${fmt(log.totals.grandTotal)}</strong>`;
 }
 
@@ -1178,6 +1276,7 @@ function editProductModal(productId) {
     document.getElementById('modal-product-title').textContent = 'Edit Roofing Sheet';
     document.getElementById('product-id-val').value    = prod.id;
     renderBrandControls();
+    renderSizeFiltersAndDropdowns();
     document.getElementById('product-brand-val').value   = prod.brand;
     document.getElementById('product-buying-val').value  = prod.buyingPrice;
     document.getElementById('product-selling-val').value = prod.sellingPrice;
@@ -1188,7 +1287,7 @@ function editProductModal(productId) {
     const customGroup = document.getElementById('product-custom-name-group');
     const nameInput   = document.getElementById('product-name-val');
 
-    const knownSize = SHEET_SIZES.find(s => s.value === prod.size);
+    const knownSize = getAllSizes().find(s => s.value === prod.size);
     if (knownSize) {
         sizeSelect.value = prod.size;
         customGroup.style.display = 'none';
@@ -1212,8 +1311,17 @@ function saveProductFromForm() {
     const stock        = parseInt(document.getElementById('product-stock-val').value) || 0;
     const alertLevel   = parseInt(document.getElementById('product-alert-val').value) || 10;
 
-    const finalSize = sizeVal === 'custom' ? customName : sizeVal;
+    const finalSize = sizeVal === 'custom' ? customName.toLowerCase().replace(/[^a-z0-9]/g, '-') : sizeVal;
     const finalName = sizeVal === 'custom' ? customName : sizeLabel(sizeVal) + ' Roofing Sheet';
+
+    if (sizeVal === 'custom' && customName) {
+        const cleanVal = customName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        if (!customSizes.some(s => s.value === cleanVal)) {
+            customSizes.push({ value: cleanVal, label: customName });
+            localStorage.setItem('pr_custom_sizes', JSON.stringify(customSizes));
+            renderSizeFiltersAndDropdowns();
+        }
+    }
 
     if (id) {
         const idx = products.findIndex(p => p.id === id);
@@ -1353,21 +1461,26 @@ function renderDashboard() {
     document.getElementById('kpi-margin').textContent      = `Profit Margin: ${margin.toFixed(1)}%`;
     document.getElementById('kpi-sales-count').textContent = salesLogs.length;
 
-    // Current inventory KPIs
+    // Transport costs from all stock lots
+    let totalTransportCost = 0;
+    stockLogs.forEach(l => { totalTransportCost += l.transportCost || 0; });
+    document.getElementById('kpi-transport-cost').textContent = `LKR ${fmt(totalTransportCost)}`;
+
+    // Current inventory KPIs  — use buying price (lot cost) NOT selling price
     let stockCost = 0;
     let stockSelling = 0;
     products.forEach(p => {
         const qty = p.stock || 0;
-        stockCost += (p.buyingPrice || 0) * qty;
+        stockCost    += (p.buyingPrice || 0) * qty;   // actual purchase cost per sheet
         stockSelling += (p.sellingPrice || 0) * qty;
     });
     const stockProfit = stockSelling - stockCost;
     const stockMargin = stockSelling > 0 ? (stockProfit / stockSelling) * 100 : 0;
 
-    document.getElementById('kpi-stock-cost').textContent = `LKR ${fmt(stockCost)}`;
+    document.getElementById('kpi-stock-cost').textContent    = `LKR ${fmt(stockCost)}`;
     document.getElementById('kpi-stock-selling').textContent = `LKR ${fmt(stockSelling)}`;
-    document.getElementById('kpi-stock-profit').textContent = `LKR ${fmt(stockProfit)}`;
-    document.getElementById('kpi-stock-margin').textContent = `Margin: ${stockMargin.toFixed(1)}%`;
+    document.getElementById('kpi-stock-profit').textContent  = `LKR ${fmt(stockProfit)}`;
+    document.getElementById('kpi-stock-margin').textContent  = `Margin: ${stockMargin.toFixed(1)}%`;
 
     renderStockAlerts();
     renderProfitabilityTable();
@@ -1481,7 +1594,7 @@ function updateDashboardCharts(period) {
 // BACKUP & RESTORE
 // ============================================================
 function exportDatabase() {
-    const data = JSON.stringify({ products, salesLogs, stockLogs, brands }, null, 2);
+    const data = JSON.stringify({ products, salesLogs, stockLogs, brands, customSizes }, null, 2);
     downloadBlob(data, `perera_backup_${todayStr()}.json`, 'application/json');
     showToast('Database backup downloaded!');
 }
@@ -1499,8 +1612,11 @@ function importDatabase(event) {
             salesLogs = data.salesLogs;
             stockLogs = data.stockLogs || [];
             brands    = data.brands || ['Sigiri','Rhino'];
+            customSizes = data.customSizes || [];
             saveProducts(); saveSales(); saveStockLogs(); saveBrands();
+            localStorage.setItem('pr_custom_sizes', JSON.stringify(customSizes));
             renderBrandControls();
+            renderSizeFiltersAndDropdowns();
             const tab = document.querySelector('.nav-item.active')?.getAttribute('data-tab') || 'dashboard';
             switchTab(tab);
             showToast('Database restored!');
