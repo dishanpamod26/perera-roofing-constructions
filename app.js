@@ -454,20 +454,42 @@ function saveStockEntry() {
     
     if (!isValid) return;
     
-    // Log the purchase as PENDING.
-    stockLogs.unshift({
-        id: 'SL-' + Date.now(),
-        timestamp: new Date().toISOString(),
-        stockNumber,
-        totalCost,
-        note,
-        status: 'pending',
-        items
-    });
+    // Check if editing an existing lot
+    const seForm = document.getElementById('stock-entry-form');
+    const editLotId = seForm.getAttribute('data-edit-lot-id');
+
+    if (editLotId) {
+        // Replace existing lot
+        const existingIdx = stockLogs.findIndex(l => l.id === editLotId);
+        if (existingIdx !== -1) {
+            stockLogs[existingIdx] = {
+                ...stockLogs[existingIdx],
+                stockNumber,
+                totalCost,
+                note,
+                items
+            };
+        }
+        seForm.removeAttribute('data-edit-lot-id');
+        showToast(`Stock lot "${stockNumber}" updated!`, 'success');
+    } else {
+        // Log the purchase as PENDING.
+        stockLogs.unshift({
+            id: 'SL-' + Date.now(),
+            timestamp: new Date().toISOString(),
+            stockNumber,
+            totalCost,
+            note,
+            status: 'pending',
+            items
+        });
+        showToast(`Stock lot logged! Lot ${stockNumber} is saved as PENDING. Click it in history to set buying/selling prices and update inventory.`, 'success');
+    }
+
     saveStockLogs();
     
     // Reset form
-    document.getElementById('stock-entry-form').reset();
+    seForm.reset();
     container.innerHTML = '';
     addSeItemRow(); // Add one default row
     
@@ -479,8 +501,6 @@ function saveStockEntry() {
     
     renderStockHistory(); // Renders the lot card list
     renderDashboard();
-    
-    showToast(`Stock lot logged! Lot ${stockNumber} is saved as PENDING. Click it in history to set buying/selling prices and update inventory.`, 'success');
 }
 
 // ============================================================
@@ -539,17 +559,102 @@ function renderStockHistory() {
             </div>
             <div class="stock-lot-card-footer">
                 <span>Logged on: ${ds}</span>
-                <span style="color: var(--primary); font-weight:700; font-size:11px; display:flex; align-items:center; gap:2px;">
-                    ${l.status === 'pending' ? 'Enter Prices' : 'View Details'} <i data-lucide="chevron-right" style="width:12px;height:12px;"></i>
-                </span>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <button class="lot-edit-btn" data-id="${l.id}" style="padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;cursor:pointer;color:var(--primary);font-size:11px;display:flex;align-items:center;gap:3px;" title="Edit Lot">
+                        <i data-lucide="edit-3" style="width:11px;height:11px;"></i> Edit
+                    </button>
+                    <button class="lot-delete-btn" data-id="${l.id}" style="padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;cursor:pointer;color:var(--danger);font-size:11px;display:flex;align-items:center;gap:3px;" title="Delete Lot">
+                        <i data-lucide="trash-2" style="width:11px;height:11px;"></i> Delete
+                    </button>
+                    <span style="color: var(--primary); font-weight:700; font-size:11px; display:flex; align-items:center; gap:2px; cursor:pointer;" class="lot-view-link">
+                        ${l.status === 'pending' ? 'Enter Prices' : 'View Details'} <i data-lucide="chevron-right" style="width:12px;height:12px;"></i>
+                    </span>
+                </div>
             </div>
         `;
         
-        card.addEventListener('click', () => openStockLotDetailsModal(l.id));
+        card.querySelector('.lot-view-link').addEventListener('click', (e) => { e.stopPropagation(); openStockLotDetailsModal(l.id); });
+        card.querySelector('.lot-edit-btn').addEventListener('click', (e) => { e.stopPropagation(); openEditStockLotModal(l.id); });
+        card.querySelector('.lot-delete-btn').addEventListener('click', (e) => { e.stopPropagation(); deleteStockLot(l.id); });
         grid.appendChild(card);
     });
     
     lucide.createIcons();
+}
+
+// ============================================================
+// STOCK LOT EDIT
+// ============================================================
+function openEditStockLotModal(lotId) {
+    const lot = stockLogs.find(l => l.id === lotId);
+    if (!lot) return;
+
+    if (lot.status === 'completed') {
+        // Completed lots: open normal view-only details modal
+        openStockLotDetailsModal(lotId);
+        showToast('Completed lots can be viewed but not edited. Delete and re-enter to change.', 'info');
+        return;
+    }
+
+    // Populate the stock entry form with existing lot data
+    document.getElementById('se-stock-number').value = lot.stockNumber || '';
+    document.getElementById('se-total-cost').value   = lot.totalCost || '';
+    document.getElementById('se-note').value          = lot.note || '';
+
+    const container = document.getElementById('se-items-container');
+    container.innerHTML = '';
+    lot.items.forEach(item => {
+        const isCustom = !SHEET_SIZES.find(s => s.value === item.size);
+        addSeItemRow(
+            item.brand,
+            isCustom ? 'custom' : item.size,
+            isCustom ? (item.sizeLabel || item.size) : '',
+            item.qty,
+            item.weight || ''
+        );
+    });
+    updateStockEntryPreview();
+
+    // Store the editing lot id so save can replace it
+    document.getElementById('stock-entry-form').setAttribute('data-edit-lot-id', lotId);
+
+    // Switch to stock management tab and scroll to form
+    switchTab('stock-management');
+    document.querySelector('.stock-form-card').scrollIntoView({ behavior: 'smooth' });
+    showToast(`Editing lot "${lot.stockNumber}" — make changes and click "Log Stock Lot" to save.`, 'info');
+}
+
+// ============================================================
+// STOCK LOT DELETE
+// ============================================================
+function deleteStockLot(lotId) {
+    const lot = stockLogs.find(l => l.id === lotId);
+    if (!lot) return;
+
+    let msg = `Delete stock lot "${lot.stockNumber}"?`;
+    if (lot.status === 'completed') {
+        msg += '\n\nWARNING: This lot is already Completed. Stock inventory will be ROLLED BACK (quantities deducted). Are you sure?';
+    }
+
+    if (!confirm(msg)) return;
+
+    if (lot.status === 'completed') {
+        // Rollback inventory
+        lot.items.forEach(item => {
+            const prod = products.find(p => p.brand === item.brand && p.size === item.size);
+            if (prod) {
+                prod.stock = Math.max(0, prod.stock - item.qty);
+            }
+        });
+        saveProducts();
+    }
+
+    stockLogs = stockLogs.filter(l => l.id !== lotId);
+    saveStockLogs();
+    renderStockHistory();
+    renderInventory();
+    renderDashboard();
+    showToast(`Lot "${lot.stockNumber}" deleted!`, 'warning');
 }
 
 function downloadStockCSV() {
@@ -803,6 +908,15 @@ function addToCart(productId) {
 
 function removeFromCart(productId) { cart = cart.filter(c => c.productId !== productId); renderCart(); }
 
+// Helper: compute discount amount for one cart item
+function computeItemDiscount(item) {
+    const line = item.sellingPrice * item.qty;
+    if (item.itemDiscountType === 'flat')       return item.itemDiscount;                         // flat LKR off total line
+    if (item.itemDiscountType === 'percent')    return line * (item.itemDiscount / 100);          // % of line total
+    if (item.itemDiscountType === 'per-sheet')  return item.itemDiscount * item.qty;              // LKR per sheet
+    return 0;
+}
+
 function renderCart() {
     const container = document.getElementById('cart-items-container');
     const printBtn  = document.getElementById('print-invoice-btn');
@@ -822,12 +936,14 @@ function renderCart() {
     if (saleBtn)  saleBtn.disabled  = false;
 
     cart.forEach((item, idx) => {
+        const discAmt = computeItemDiscount(item);
+        const lineTotal = Math.max(0, item.sellingPrice * item.qty - discAmt);
         const row = document.createElement('div');
         row.className = 'cart-item';
         row.innerHTML = `
             <div class="cart-item-details">
                 <strong>${item.name}</strong>
-                <small class="text-muted">${item.brand} &bull; LKR ${fmt(item.sellingPrice)} each</small>
+                <small class="text-muted">${item.brand} &bull; LKR ${fmt(item.sellingPrice)}/sheet &bull; <span class="cart-item-linetotal">Line: LKR ${fmt(lineTotal)}</span></small>
             </div>
             <div class="cart-item-controls">
                 <div class="qty-control">
@@ -838,8 +954,9 @@ function renderCart() {
                 <div class="item-discount-control" style="display:flex;gap:4px;align-items:center;">
                     <input type="number" class="item-disc-val" value="${item.itemDiscount}" min="0" placeholder="Disc" data-idx="${idx}" style="width:60px;border:1px solid var(--border);border-radius:4px;padding:4px;font-size:12px;">
                     <select class="item-disc-type" data-idx="${idx}" style="border:1px solid var(--border);border-radius:4px;padding:4px;font-size:12px;font-family:inherit;">
-                        <option value="flat"    ${item.itemDiscountType==='flat'   ?'selected':''}>LKR</option>
-                        <option value="percent" ${item.itemDiscountType==='percent'?'selected':''}>%</option>
+                        <option value="flat"      ${item.itemDiscountType==='flat'     ?'selected':''}>LKR</option>
+                        <option value="percent"   ${item.itemDiscountType==='percent'  ?'selected':''}>%</option>
+                        <option value="per-sheet" ${item.itemDiscountType==='per-sheet'?'selected':''}>LKR/Sheet</option>
                     </select>
                 </div>
                 <button type="button" class="remove-cart-item" data-idx="${idx}" style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;cursor:pointer;color:var(--danger);" title="Remove">
@@ -877,7 +994,7 @@ function calculateCartTotals() {
     cart.forEach(item => {
         const line=item.sellingPrice*item.qty;
         const cost=item.buyingPrice*item.qty;
-        const disc=item.itemDiscountType==='flat'?item.itemDiscount*item.qty:line*(item.itemDiscount/100);
+        const disc=computeItemDiscount(item);
         subtotal+=line; totalCost+=cost; itemDiscTotal+=disc;
     });
     const extVal=parseFloat(document.getElementById('extra-discount-val').value)||0;
@@ -893,6 +1010,31 @@ function calculateCartTotals() {
     const custTotal = document.getElementById('cust-grand-total');
     if (custSub)   custSub.textContent   = `LKR ${fmt(subtotal)}`;
     if (custTotal) custTotal.textContent = `LKR ${fmt(grandTotal)}`;
+
+    // Per-item breakdown (customer view)
+    let breakdownEl = document.getElementById('cart-items-breakdown');
+    if (!breakdownEl) {
+        breakdownEl = document.createElement('div');
+        breakdownEl.id = 'cart-items-breakdown';
+        breakdownEl.style.cssText = 'margin-bottom:6px;';
+        const custView = document.getElementById('summary-customer-view');
+        const subLine = custView ? custView.querySelector('.summary-line') : null;
+        if (subLine) custView.insertBefore(breakdownEl, subLine);
+    }
+    if (cart.length > 1) {
+        breakdownEl.innerHTML = `<div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Per Sheet Breakdown</div>` +
+            cart.map(item => {
+                const disc = computeItemDiscount(item);
+                const lineNet = Math.max(0, item.sellingPrice * item.qty - disc);
+                return `<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px dashed var(--border);">
+                    <span style="color:var(--text-secondary);">${item.name} × ${item.qty}</span>
+                    <span style="font-weight:600;">LKR ${fmt(lineNet)}${disc>0?` <span style="color:var(--danger);font-size:10px;">(-${fmt(disc)})</span>`:''}</span>
+                </div>`;
+            }).join('');
+        breakdownEl.style.display = 'block';
+    } else {
+        breakdownEl.style.display = 'none';
+    }
 
     // Internal view
     const intCost   = document.getElementById('int-total-cost');
@@ -920,7 +1062,7 @@ function checkoutQuotation() {
         const prod = products.find(p => p.id === item.productId);
         prod.stock -= item.qty;
         const line=item.sellingPrice*item.qty;
-        const disc=item.itemDiscountType==='flat'?item.itemDiscount*item.qty:line*(item.itemDiscount/100);
+        const disc=computeItemDiscount(item);
         return { productId:item.productId, name:item.name, brand:item.brand, buyingPrice:item.buyingPrice, sellingPrice:item.sellingPrice, qty:item.qty, itemDiscount:disc, finalPrice:line-disc };
     });
     saveProducts();
@@ -940,7 +1082,7 @@ function triggerInvoicePrint() {
     const totals = calculateCartTotals();
     const items = cart.map(item => {
         const line=item.sellingPrice*item.qty;
-        const disc=item.itemDiscountType==='flat'?item.itemDiscount*item.qty:line*(item.itemDiscount/100);
+        const disc=computeItemDiscount(item);
         return { name:item.name, brand:item.brand, sellingPrice:item.sellingPrice, qty:item.qty, itemDiscount:disc, finalPrice:line-disc };
     });
     populateInvoiceForPrint({ id:'QUOTE-'+Date.now().toString().slice(-6), timestamp:new Date().toISOString(), items, totals });
