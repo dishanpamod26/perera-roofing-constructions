@@ -2,83 +2,48 @@
 // STATE MANAGEMENT & LOCAL STORAGE
 // ==========================================
 
-// Default roofing sheets database is now completely empty by default
-const DEFAULT_PRODUCTS = [];
-
-// Initialize State
 let products = JSON.parse(localStorage.getItem('pr_products')) || [];
 let salesLogs = JSON.parse(localStorage.getItem('pr_sales_logs')) || [];
 let brands = JSON.parse(localStorage.getItem('pr_brands')) || ['Sigiri', 'Rhino'];
-let cart = []; // In-memory active quotation cart
-let activeChart = null; // ChartJS instance reference
+let cart = [];
+let activeChart = null;
 
-// Save products database helper
-function saveProducts() {
-    localStorage.setItem('pr_products', JSON.stringify(products));
-}
-
-// Save sales logs database helper
-function saveSales() {
-    localStorage.setItem('pr_sales_logs', JSON.stringify(salesLogs));
-}
-
-// Save brands helper
-function saveBrands() {
-    localStorage.setItem('pr_brands', JSON.stringify(brands));
-}
+function saveProducts() { localStorage.setItem('pr_products', JSON.stringify(products)); }
+function saveSales()    { localStorage.setItem('pr_sales_logs', JSON.stringify(salesLogs)); }
+function saveBrands()   { localStorage.setItem('pr_brands', JSON.stringify(brands)); }
 
 // ==========================================
-// TOAST NOTIFICATIONS HELPER
+// TOAST NOTIFICATIONS
 // ==========================================
 function showToast(message, type = 'success') {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    
-    let iconName = 'check-circle-2';
-    if (type === 'danger') iconName = 'alert-octagon';
-    if (type === 'warning') iconName = 'alert-triangle';
-    if (type === 'info') iconName = 'info';
-    
-    toast.innerHTML = `
-        <i data-lucide="${iconName}"></i>
-        <span>${message}</span>
-    `;
-    
+    const icons = { success: 'check-circle-2', danger: 'alert-octagon', warning: 'alert-triangle', info: 'info' };
+    toast.innerHTML = `<i data-lucide="${icons[type] || 'check-circle-2'}"></i><span>${message}</span>`;
     container.appendChild(toast);
     lucide.createIcons();
-    
-    // Slide out after 3 seconds
     setTimeout(() => {
         toast.classList.add('fade-out');
-        toast.addEventListener('animationend', () => {
-            toast.remove();
-        });
-    }, 3000);
+        toast.addEventListener('animationend', () => toast.remove());
+    }, 3500);
 }
 
 // ==========================================
-// DYNAMIC BRANDS RENDERING CONTROLLER
+// BRAND CONTROLS RENDER
 // ==========================================
 function renderBrandControls() {
-    // 1. Calculator catalog brand tabs
+    // Calculator brand tabs
     const catalogTabs = document.getElementById('catalog-brand-tabs');
     if (catalogTabs) {
-        let catalogActiveBrand = 'all';
         const prevActive = catalogTabs.querySelector('.brand-tab.active');
-        if (prevActive) {
-            catalogActiveBrand = prevActive.getAttribute('data-brand');
-        }
-        
+        let catalogActiveBrand = prevActive ? prevActive.getAttribute('data-brand') : 'all';
         let tabsHTML = `<button class="brand-tab ${catalogActiveBrand === 'all' ? 'active' : ''}" data-brand="all">All Brands</button>`;
         brands.forEach(b => {
-            tabsHTML += `<button class="brand-tab ${catalogActiveBrand.toLowerCase() === b.toLowerCase() ? 'active' : ''}" data-brand="${b}">${b}</button>`;
+            tabsHTML += `<button class="brand-tab ${catalogActiveBrand === b ? 'active' : ''}" data-brand="${b}">${b}</button>`;
         });
         tabsHTML += `<button class="brand-tab ${catalogActiveBrand === 'other' ? 'active' : ''}" data-brand="other">Other</button>`;
-        
         catalogTabs.innerHTML = tabsHTML;
-        
-        // Re-bind click listeners
         catalogTabs.querySelectorAll('.brand-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
                 catalogTabs.querySelectorAll('.brand-tab').forEach(t => t.classList.remove('active'));
@@ -87,174 +52,110 @@ function renderBrandControls() {
             });
         });
     }
-    
-    // 2. Inventory brand filter select
-    const invFilterSelect = document.getElementById('inventory-filter-brand');
-    if (invFilterSelect) {
-        const prevVal = invFilterSelect.value || 'all';
-        let optionsHTML = `<option value="all">All Brands</option>`;
-        brands.forEach(b => {
-            optionsHTML += `<option value="${b}">${b}</option>`;
-        });
-        optionsHTML += `<option value="Other">Other</option>`;
-        invFilterSelect.innerHTML = optionsHTML;
-        invFilterSelect.value = prevVal;
+
+    // Inventory filter select
+    const invFilter = document.getElementById('inventory-filter-brand');
+    if (invFilter) {
+        const prev = invFilter.value || 'all';
+        invFilter.innerHTML = `<option value="all">All Brands</option>` +
+            brands.map(b => `<option value="${b}">${b}</option>`).join('') +
+            `<option value="Other">Other</option>`;
+        invFilter.value = (invFilter.querySelector(`option[value="${prev}"]`)) ? prev : 'all';
     }
-    
-    // 3. Product add/edit modal brand select
-    const prodModalSelect = document.getElementById('product-brand-val');
-    if (prodModalSelect) {
-        let modalOptions = '';
-        brands.forEach(b => {
-            modalOptions += `<option value="${b}">${b}</option>`;
-        });
-        modalOptions += `<option value="Other">Other</option>`;
-        prodModalSelect.innerHTML = modalOptions;
+
+    // Product modal brand select
+    const prodSelect = document.getElementById('product-brand-val');
+    if (prodSelect) {
+        const prev = prodSelect.value;
+        prodSelect.innerHTML = brands.map(b => `<option value="${b}">${b}</option>`).join('') + `<option value="Other">Other</option>`;
+        if (prodSelect.querySelector(`option[value="${prev}"]`)) prodSelect.value = prev;
     }
-    
-    // 4. Lot Modal brand select
-    const lotModalSelect = document.getElementById('lot-brand-val');
-    if (lotModalSelect) {
-        const prevVal = lotModalSelect.value;
-        let lotOptions = '';
-        brands.forEach(b => {
-            lotOptions += `<option value="${b}">${b}</option>`;
-        });
-        lotOptions += `<option value="Other">Other</option>`;
-        lotModalSelect.innerHTML = lotOptions;
-        if (prevVal && lotModalSelect.querySelector(`option[value="${prevVal}"]`)) {
-            lotModalSelect.value = prevVal;
-        }
+
+    // Lot modal brand select
+    const lotSelect = document.getElementById('lot-brand-val');
+    if (lotSelect) {
+        const prev = lotSelect.value;
+        lotSelect.innerHTML = brands.map(b => `<option value="${b}">${b}</option>`).join('') + `<option value="Other">Other</option>`;
+        if (lotSelect.querySelector(`option[value="${prev}"]`)) lotSelect.value = prev;
     }
 }
 
 // ==========================================
-// APP INITIALIZATION & NAVIGATION
+// INITIALIZATION
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
-    // Setup live date
     updateLiveDate();
-    setInterval(updateLiveDate, 60000); // Update every minute
-    
-    // Render dynamic brand selections
+    setInterval(updateLiveDate, 60000);
     renderBrandControls();
-    
-    // Tab switching routing
-    const navItems = document.querySelectorAll('.nav-item');
-    navItems.forEach(item => {
+
+    document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', (e) => {
-            const btn = e.currentTarget;
-            const targetTab = btn.getAttribute('data-tab');
-            switchTab(targetTab);
+            switchTab(e.currentTarget.getAttribute('data-tab'));
         });
     });
-    
-    // Initial UI render
+
     switchTab('dashboard');
     lucide.createIcons();
-    
-    // Event listeners
     setupEventListeners();
 });
 
 function updateLiveDate() {
-    const options = { year: 'numeric', month: 'long', day: 'numeric' };
-    const dateStr = new Date().toLocaleDateString('en-US', options);
-    document.getElementById('live-date').textContent = dateStr;
+    const el = document.getElementById('live-date');
+    if (el) el.textContent = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 function switchTab(tabId) {
-    // Update active nav buttons styling
-    const navButtons = document.querySelectorAll('.nav-item');
-    navButtons.forEach(btn => {
-        if (btn.getAttribute('data-tab') === tabId) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
+    document.querySelectorAll('.nav-item').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabId);
     });
-    
-    // Toggle tab panes visibility
-    const panes = document.querySelectorAll('.tab-pane');
-    panes.forEach(pane => {
-        if (pane.id === tabId) {
-            pane.classList.add('active');
-        } else {
-            pane.classList.remove('active');
-        }
+    document.querySelectorAll('.tab-pane').forEach(pane => {
+        pane.classList.toggle('active', pane.id === tabId);
     });
-    
-    // Update top header text based on active tab
-    const title = document.getElementById('current-tab-title');
-    const subtitle = document.getElementById('current-tab-subtitle');
-    
-    if (tabId === 'dashboard') {
-        title.textContent = 'Dashboard Overview';
-        subtitle.textContent = 'Real-time sales statistics and stock statuses';
-        renderDashboard();
-    } else if (tabId === 'calculator') {
-        title.textContent = 'Quotation Calculator';
-        subtitle.textContent = 'Select roofing sheets, add quantity/discounts, and make sales';
-        renderCatalog();
-        renderCart();
-    } else if (tabId === 'inventory') {
-        title.textContent = 'Inventory Management';
-        subtitle.textContent = 'Add products, update buying/selling prices, and adjust stock counts';
-        renderInventory();
-    } else if (tabId === 'sales') {
-        title.textContent = 'Sales Transaction Logs';
-        subtitle.textContent = 'Full history of completed customer purchases, costs, and profits';
-        renderSalesLogs();
+
+    const titles = {
+        dashboard: ['Dashboard Overview', 'Real-time sales statistics and stock statuses'],
+        calculator: ['Quotation Calculator', 'Select roofing sheets, add quantity/discounts, and make sales'],
+        inventory: ['Inventory Management', 'Add products, update buying/selling prices, and adjust stock counts'],
+        sales: ['Sales Transaction Logs', 'Full history of completed customer purchases, costs, and profits']
+    };
+
+    if (titles[tabId]) {
+        document.getElementById('current-tab-title').textContent = titles[tabId][0];
+        document.getElementById('current-tab-subtitle').textContent = titles[tabId][1];
     }
-    
+
+    if (tabId === 'dashboard')  renderDashboard();
+    if (tabId === 'calculator') { renderCatalog(); renderCart(); }
+    if (tabId === 'inventory')  renderInventory();
+    if (tabId === 'sales')      renderSalesLogs();
+
     lucide.createIcons();
 }
 
 // ==========================================
-// SYSTEM EVENT LISTENERS
+// EVENT LISTENERS SETUP
 // ==========================================
 function setupEventListeners() {
-    // 1. Calculator search
-    const searchInput = document.getElementById('catalog-search');
-    searchInput.addEventListener('input', () => {
-        renderCatalog();
-    });
-    
-    // 2. Extra discount handlers in cart
-    const extraDiscVal = document.getElementById('extra-discount-val');
-    const extraDiscType = document.getElementById('extra-discount-type');
-    
-    extraDiscVal.addEventListener('input', () => {
-        if (extraDiscVal.value < 0) extraDiscVal.value = 0;
-        calculateCartTotals();
-    });
-    
-    extraDiscType.addEventListener('change', () => {
-        calculateCartTotals();
-    });
-    
-    // 3. Calculator View Swapper (Customer vs Internal)
-    const viewTabs = document.querySelectorAll('.view-tab');
-    viewTabs.forEach(tab => {
+
+    // Catalog search
+    document.getElementById('catalog-search').addEventListener('input', renderCatalog);
+
+    // Extra discount
+    document.getElementById('extra-discount-val').addEventListener('input', calculateCartTotals);
+    document.getElementById('extra-discount-type').addEventListener('change', calculateCartTotals);
+
+    // Customer vs Internal view tabs
+    document.querySelectorAll('.view-tab').forEach(tab => {
         tab.addEventListener('click', (e) => {
-            viewTabs.forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
             e.currentTarget.classList.add('active');
-            
-            const targetView = e.currentTarget.getAttribute('data-view');
-            const custView = document.getElementById('summary-customer-view');
-            const intView = document.getElementById('summary-internal-view');
-            
-            if (targetView === 'customer') {
-                custView.classList.add('active');
-                intView.classList.remove('active');
-            } else {
-                custView.classList.remove('active');
-                intView.classList.add('active');
-            }
+            const v = e.currentTarget.getAttribute('data-view');
+            document.getElementById('summary-customer-view').classList.toggle('active', v === 'customer');
+            document.getElementById('summary-internal-view').classList.toggle('active', v === 'internal');
         });
     });
-    
-    // 4. Cart actions (Clear, Print, Confirm)
+
+    // Cart action buttons
     document.getElementById('clear-cart-btn').addEventListener('click', () => {
         if (cart.length > 0) {
             cart = [];
@@ -263,330 +164,238 @@ function setupEventListeners() {
             showToast('Quotation cart cleared!', 'info');
         }
     });
-    
-    document.getElementById('confirm-sale-btn').addEventListener('click', () => {
-        checkoutQuotation();
-    });
-    
-    document.getElementById('print-invoice-btn').addEventListener('click', () => {
-        triggerInvoicePrint();
-    });
-    
-    // 5. Inventory search & filters
-    const invSearch = document.getElementById('inventory-search');
-    const invBrandFilter = document.getElementById('inventory-filter-brand');
-    
-    invSearch.addEventListener('input', () => renderInventory());
-    invBrandFilter.addEventListener('change', () => renderInventory());
-    
-    // 6. Product modal controls
-    const addProductBtn = document.getElementById('add-product-btn');
+    document.getElementById('confirm-sale-btn').addEventListener('click', checkoutQuotation);
+    document.getElementById('print-invoice-btn').addEventListener('click', triggerInvoicePrint);
+
+    // Inventory search & filter
+    document.getElementById('inventory-search').addEventListener('input', renderInventory);
+    document.getElementById('inventory-filter-brand').addEventListener('change', renderInventory);
+
+    // Product modal
     const productModal = document.getElementById('product-modal');
-    const closeProductModal = document.getElementById('close-product-modal');
-    const cancelProductModal = document.getElementById('cancel-product-modal');
-    const productForm = document.getElementById('product-form');
-    
-    addProductBtn.addEventListener('click', () => {
+    const productForm  = document.getElementById('product-form');
+
+    document.getElementById('add-product-btn').addEventListener('click', () => {
         document.getElementById('modal-product-title').textContent = 'Add New Roofing Sheet';
         document.getElementById('product-id-val').value = '';
         productForm.reset();
         renderBrandControls();
         productModal.classList.add('active');
     });
-    
-    const closeModalFunc = () => {
-        productModal.classList.remove('active');
-    };
-    
-    closeProductModal.addEventListener('click', closeModalFunc);
-    cancelProductModal.addEventListener('click', closeModalFunc);
-    
+
+    const closeProductModal = () => productModal.classList.remove('active');
+    document.getElementById('close-product-modal').addEventListener('click', closeProductModal);
+    document.getElementById('cancel-product-modal').addEventListener('click', closeProductModal);
+
     productForm.addEventListener('submit', (e) => {
         e.preventDefault();
         saveProductFromForm();
-        closeModalFunc();
+        closeProductModal();
     });
-    
-    // 7. Quick Add Brand Button
+
+    // Add Brand quick button (inside product modal)
     document.getElementById('add-brand-quick-btn').addEventListener('click', () => {
-        const rawBrand = prompt("Enter new brand name (e.g. Sigiri, Rhino, LANKA):");
-        if (rawBrand && rawBrand.trim()) {
-            const cleanBrand = rawBrand.trim();
-            // Check if brand exists
-            if (brands.some(b => b.toLowerCase() === cleanBrand.toLowerCase())) {
-                showToast(`Brand "${cleanBrand}" already exists!`, 'warning');
-                return;
-            }
-            brands.push(cleanBrand);
-            saveBrands();
-            renderBrandControls();
-            
-            // Auto select new brand in modal
-            document.getElementById('product-brand-val').value = cleanBrand;
-            showToast(`Brand "${cleanBrand}" added and selected!`, 'success');
+        const rawBrand = prompt('Enter new brand name (e.g. Lanka, Metrix):');
+        if (!rawBrand || !rawBrand.trim()) return;
+        const clean = rawBrand.trim();
+        if (brands.some(b => b.toLowerCase() === clean.toLowerCase())) {
+            showToast(`Brand "${clean}" already exists!`, 'warning');
+            return;
         }
+        brands.push(clean);
+        saveBrands();
+        renderBrandControls();
+        document.getElementById('product-brand-val').value = clean;
+        showToast(`Brand "${clean}" added!`, 'success');
     });
-    
-    // 8. CSV Downloads (Spreadsheet Reports)
+
+    // CSV downloads
     document.getElementById('download-inventory-csv-btn').addEventListener('click', downloadInventoryCSV);
     document.getElementById('download-sales-csv-btn').addEventListener('click', downloadSalesCSV);
-    
-    // 9. Stock Lot Modal Event Listeners
-    const addLotBtn = document.getElementById('add-lot-btn');
+
+    // ── Stock Lot Modal ──────────────────────────────────────
     const lotModal = document.getElementById('lot-modal');
-    const closeLotModal = document.getElementById('close-lot-modal');
-    const cancelLotModal = document.getElementById('cancel-lot-modal');
-    const lotForm = document.getElementById('lot-form');
-    
-    addLotBtn.addEventListener('click', () => {
+    const lotForm  = document.getElementById('lot-form');
+
+    document.getElementById('add-lot-btn').addEventListener('click', () => {
         lotForm.reset();
         document.getElementById('lot-items-container').innerHTML = '';
-        renderBrandControls(); // dynamic list
-        addLotItemRow(); // first row
+        renderBrandControls();
+        addLotItemRow();          // start with one blank row
         lotModal.classList.add('active');
+        lucide.createIcons();
     });
-    
-    const closeLotModalFunc = () => {
-        lotModal.classList.remove('active');
-    };
-    
-    closeLotModal.addEventListener('click', closeLotModalFunc);
-    cancelLotModal.addEventListener('click', closeLotModalFunc);
-    
+
+    const closeLotModal = () => lotModal.classList.remove('active');
+    document.getElementById('close-lot-modal').addEventListener('click', closeLotModal);
+    document.getElementById('cancel-lot-modal').addEventListener('click', closeLotModal);
+
     lotForm.addEventListener('submit', (e) => {
         e.preventDefault();
         saveLotToStock();
     });
-    
-    document.getElementById('add-lot-row-btn').addEventListener('click', () => {
-        addLotItemRow();
-    });
-    
+
+    document.getElementById('add-lot-row-btn').addEventListener('click', addLotItemRow);
+
     document.getElementById('lot-brand-val').addEventListener('change', () => {
-        const selectedBrand = document.getElementById('lot-brand-val').value;
-        const rows = document.querySelectorAll('.lot-item-row');
-        rows.forEach(row => {
-            const select = row.querySelector('.lot-item-product-select');
-            const prevVal = select.value;
-            populateRowProductsSelect(select, selectedBrand);
-            if (select.querySelector(`option[value="${prevVal}"]`)) {
-                select.value = prevVal;
-            }
+        const brand = document.getElementById('lot-brand-val').value;
+        document.querySelectorAll('.lot-item-product-select').forEach(sel => {
+            const prev = sel.value;
+            populateRowProductsSelect(sel, brand);
+            if (sel.querySelector(`option[value="${prev}"]`)) sel.value = prev;
         });
         calculateLotCosts();
     });
-    
-    document.getElementById('lot-cost-val').addEventListener('input', () => {
-        calculateLotCosts();
-    });
-    
-    // 10. Sales log filters & operations
-    const salesSearch = document.getElementById('sales-search');
-    const salesFilterDate = document.getElementById('sales-filter-date');
-    const clearDateBtn = document.getElementById('clear-date-filter');
-    
-    salesSearch.addEventListener('input', () => renderSalesLogs());
-    salesFilterDate.addEventListener('change', () => renderSalesLogs());
-    clearDateBtn.addEventListener('click', () => {
-        salesFilterDate.value = '';
+
+    document.getElementById('lot-cost-val').addEventListener('input', calculateLotCosts);
+
+    // Sales log controls
+    document.getElementById('sales-search').addEventListener('input', renderSalesLogs);
+    document.getElementById('sales-filter-date').addEventListener('change', renderSalesLogs);
+    document.getElementById('clear-date-filter').addEventListener('click', () => {
+        document.getElementById('sales-filter-date').value = '';
         renderSalesLogs();
     });
-    
     document.getElementById('reset-sales-btn').addEventListener('click', () => {
-        if (confirm('WARNING: Are you sure you want to clear ALL sales logs? This action is permanent!')) {
+        if (confirm('WARNING: Clear ALL sales logs permanently?')) {
             salesLogs = [];
             saveSales();
             renderSalesLogs();
-            showToast('All transaction logs deleted successfully!', 'danger');
+            showToast('All transaction logs deleted!', 'danger');
         }
     });
-    
-    // 11. Backup & Restore Database
+
+    // Backup/Restore
     document.getElementById('export-db-btn').addEventListener('click', exportDatabase);
-    document.getElementById('import-db-btn').addEventListener('click', () => {
-        document.getElementById('import-file').click();
-    });
+    document.getElementById('import-db-btn').addEventListener('click', () => document.getElementById('import-file').click());
     document.getElementById('import-file').addEventListener('change', importDatabase);
-    
-    // 12. Dashboard chart filter buttons
-    const chartFilters = document.querySelectorAll('.chart-filter-btn');
-    chartFilters.forEach(btn => {
+
+    // Dashboard chart filters
+    document.querySelectorAll('.chart-filter-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            chartFilters.forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.chart-filter-btn').forEach(b => b.classList.remove('active'));
             e.currentTarget.classList.add('active');
-            const period = e.currentTarget.getAttribute('data-period');
-            updateDashboardCharts(period);
+            updateDashboardCharts(e.currentTarget.getAttribute('data-period'));
         });
     });
 }
 
 // ==========================================
-// STOCK LOT CALCULATION UTILITIES
+// STOCK LOT FUNCTIONS
 // ==========================================
-
 function addLotItemRow() {
     const container = document.getElementById('lot-items-container');
-    const selectedBrand = document.getElementById('lot-brand-val').value;
+    const brand = document.getElementById('lot-brand-val').value;
+
     const row = document.createElement('div');
     row.className = 'lot-item-row';
-    row.style.display = 'flex';
-    row.style.gap = '8px';
-    row.style.alignItems = 'flex-start';
-    row.style.marginTop = '4px';
-    
+    row.style.cssText = 'display:flex;gap:8px;align-items:flex-start;margin-top:4px;';
+
     row.innerHTML = `
-        <div style="flex: 2; display: flex; flex-direction: column;">
-            <select class="lot-item-product-select form-select-sm" required style="width: 100%; height: 38px; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--radius-sm);">
-                <!-- Injected dynamically -->
+        <div style="flex:2;display:flex;flex-direction:column;gap:4px;">
+            <select class="lot-item-product-select" style="width:100%;height:38px;padding:0 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:inherit;font-size:13px;background:var(--surface);color:var(--text-primary);">
             </select>
-            <input type="text" class="lot-item-new-product-input" placeholder="Enter new sheet size details..." style="display: none; height: 38px; margin-top: 4px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px;">
+            <input type="text" class="lot-item-new-product-input" placeholder="New size/description..." style="display:none;height:38px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-family:inherit;">
         </div>
-        <div style="flex: 1;">
-            <input type="number" class="lot-item-qty-input" placeholder="Sheets" required min="1" style="width: 100%; height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px;">
+        <div style="flex:1;">
+            <input type="number" class="lot-item-qty-input" placeholder="Sheets" min="1" style="width:100%;height:38px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-family:inherit;">
         </div>
-        <button type="button" class="btn-icon delete-action remove-lot-row-btn" style="height: 38px; width: 38px; border: 1px solid var(--border); border-radius: var(--radius-sm); margin: 0; display: flex; align-items: center; justify-content: center;" title="Remove row">
-            <i data-lucide="trash-2"></i>
+        <button type="button" class="remove-lot-row-btn" style="height:38px;width:38px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Remove row">
+            <i data-lucide="trash-2" style="width:16px;height:16px;"></i>
         </button>
     `;
-    
+
     container.appendChild(row);
     lucide.createIcons();
-    
-    const productSelect = row.querySelector('.lot-item-product-select');
-    const newProductInput = row.querySelector('.lot-item-new-product-input');
+
+    const select   = row.querySelector('.lot-item-product-select');
+    const newInput = row.querySelector('.lot-item-new-product-input');
     const qtyInput = row.querySelector('.lot-item-qty-input');
     const removeBtn = row.querySelector('.remove-lot-row-btn');
-    
-    // Populate select options
-    populateRowProductsSelect(productSelect, selectedBrand);
-    
-    // Select change listener
-    productSelect.addEventListener('change', () => {
-        if (productSelect.value === '__new__') {
-            newProductInput.style.display = 'block';
-            newProductInput.required = true;
-        } else {
-            newProductInput.style.display = 'none';
-            newProductInput.required = false;
-        }
+
+    populateRowProductsSelect(select, brand);
+
+    select.addEventListener('change', () => {
+        const isNew = select.value === '__new__';
+        newInput.style.display = isNew ? 'block' : 'none';
+        newInput.required = isNew;
         calculateLotCosts();
     });
-    
-    // Quantity change listener
-    qtyInput.addEventListener('input', () => {
-        if (qtyInput.value < 1) qtyInput.value = '';
-        calculateLotCosts();
-    });
-    
-    // Remove row listener
+
+    qtyInput.addEventListener('input', calculateLotCosts);
+
     removeBtn.addEventListener('click', () => {
-        const rowsCount = document.querySelectorAll('.lot-item-row').length;
-        if (rowsCount > 1) {
+        if (document.querySelectorAll('.lot-item-row').length > 1) {
             row.remove();
             calculateLotCosts();
         } else {
-            showToast('Must have at least one sheet type in the lot!', 'warning');
+            showToast('Need at least one sheet type in the lot!', 'warning');
         }
     });
-    
+
     calculateLotCosts();
 }
 
-function populateRowProductsSelect(selectElement, brand) {
-    const brandProducts = products.filter(p => p.brand.toLowerCase() === brand.toLowerCase());
-    let selectHTML = `<option value="" disabled selected>-- Select Sheet Size --</option>`;
-    brandProducts.forEach(p => {
-        selectHTML += `<option value="${p.id}">${p.name} (Stock: ${p.stock})</option>`;
-    });
-    selectHTML += `<option value="__new__" style="font-weight: bold; color: var(--secondary);">+ Add New Size...</option>`;
-    selectElement.innerHTML = selectHTML;
+function populateRowProductsSelect(selectEl, brand) {
+    const brandProds = products.filter(p => p.brand === brand);
+    selectEl.innerHTML =
+        `<option value="" disabled selected>-- Select Sheet Size --</option>` +
+        brandProds.map(p => `<option value="${p.id}">${p.name} (Stock: ${p.stock})</option>`).join('') +
+        `<option value="__new__">+ Add New Size...</option>`;
 }
 
 function calculateLotCosts() {
-    const lotCostVal = parseFloat(document.getElementById('lot-cost-val').value) || 0;
-    const qtyInputs = document.querySelectorAll('.lot-item-qty-input');
-    
-    let totalSheets = 0;
-    qtyInputs.forEach(input => {
-        totalSheets += parseInt(input.value) || 0;
+    const lotCost = parseFloat(document.getElementById('lot-cost-val').value) || 0;
+    let total = 0;
+    document.querySelectorAll('.lot-item-qty-input').forEach(inp => {
+        total += parseInt(inp.value) || 0;
     });
-    
-    const costPerSheet = totalSheets > 0 ? lotCostVal / totalSheets : 0;
-    
-    document.getElementById('lot-preview-total-sheets').textContent = totalSheets.toLocaleString('en-US');
-    document.getElementById('lot-preview-cost-per-sheet').textContent = `LKR ${costPerSheet.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    const perSheet = total > 0 ? lotCost / total : 0;
+    document.getElementById('lot-preview-total-sheets').textContent = total.toLocaleString('en-US');
+    document.getElementById('lot-preview-cost-per-sheet').textContent =
+        `LKR ${perSheet.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function saveLotToStock() {
-    const brand = document.getElementById('lot-brand-val').value;
-    const weight = parseFloat(document.getElementById('lot-weight-val').value) || 0;
+    const brand   = document.getElementById('lot-brand-val').value;
     const lotCost = parseFloat(document.getElementById('lot-cost-val').value) || 0;
-    const rows = document.querySelectorAll('.lot-item-row');
-    
-    if (lotCost <= 0) {
-        showToast('Please enter a valid total lot cost!', 'warning');
-        return;
-    }
-    
-    // Validate sheet entries
+    const rows    = document.querySelectorAll('.lot-item-row');
+
+    if (lotCost <= 0) { showToast('Enter a valid lot cost!', 'warning'); return; }
+
     let totalSheets = 0;
-    const itemsToUpdate = [];
-    
-    for (let row of rows) {
+    const items = [];
+
+    for (const row of rows) {
         const select = row.querySelector('.lot-item-product-select');
-        const qtyInput = row.querySelector('.lot-item-qty-input');
-        const qty = parseInt(qtyInput.value) || 0;
-        
-        if (!select.value) {
-            showToast('Please select or specify a product size for all rows!', 'warning');
-            return;
-        }
-        
-        if (qty <= 0) {
-            showToast('Please enter a valid quantity of sheets!', 'warning');
-            return;
-        }
-        
+        const qty    = parseInt(row.querySelector('.lot-item-qty-input').value) || 0;
+
+        if (!select.value) { showToast('Select or specify a sheet for every row!', 'warning'); return; }
+        if (qty <= 0)       { showToast('Enter valid sheet quantity for every row!', 'warning'); return; }
+
         totalSheets += qty;
-        
+
         if (select.value === '__new__') {
-            const newNameInput = row.querySelector('.lot-item-new-product-input');
-            const newName = newNameInput.value.trim();
-            if (!newName) {
-                showToast('Please enter the name/description for the new sheet!', 'warning');
-                return;
-            }
-            itemsToUpdate.push({
-                isNew: true,
-                name: newName,
-                qty: qty
-            });
+            const newName = row.querySelector('.lot-item-new-product-input').value.trim();
+            if (!newName) { showToast('Enter a name for the new sheet size!', 'warning'); return; }
+            items.push({ isNew: true, name: newName, qty });
         } else {
-            itemsToUpdate.push({
-                isNew: false,
-                productId: select.value,
-                qty: qty
-            });
+            items.push({ isNew: false, productId: select.value, qty });
         }
     }
-    
-    if (totalSheets <= 0) {
-        showToast('Total sheet count in this lot must be greater than zero!', 'warning');
-        return;
-    }
-    
-    const calculatedCostPerSheet = lotCost / totalSheets;
-    
-    // Update database items
-    itemsToUpdate.forEach(item => {
+
+    if (totalSheets <= 0) { showToast('Total sheet count must be greater than zero!', 'warning'); return; }
+
+    const costPerSheet = lotCost / totalSheets;
+
+    items.forEach(item => {
         if (item.isNew) {
-            const newId = 'prod_' + Date.now() + Math.random().toString(36).substr(2, 4);
             products.push({
-                id: newId,
+                id: 'prod_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
                 name: item.name,
                 brand: brand,
-                buyingPrice: calculatedCostPerSheet,
-                sellingPrice: calculatedCostPerSheet * 1.2, // Default 20% margin
+                buyingPrice: costPerSheet,
+                sellingPrice: Math.round(costPerSheet * 1.2 * 100) / 100,
                 stock: item.qty,
                 alertLevel: 10
             });
@@ -594,779 +403,691 @@ function saveLotToStock() {
             const prod = products.find(p => p.id === item.productId);
             if (prod) {
                 prod.stock += item.qty;
-                prod.buyingPrice = calculatedCostPerSheet; // auto update buying price to lot average
+                prod.buyingPrice = costPerSheet;
             }
         }
     });
-    
+
     saveProducts();
-    
-    // Clean up UI & notify
     document.getElementById('lot-modal').classList.remove('active');
     renderInventory();
     renderCatalog();
     renderDashboard();
-    
-    showToast(`Stock Lot successfully added! Calculated Buying Cost/Sheet: LKR ${calculatedCostPerSheet.toLocaleString('en-US', {minimumFractionDigits: 2})}`, 'success');
+    showToast(`Stock Lot added! Buying Cost/Sheet: LKR ${costPerSheet.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 'success');
 }
 
 // ==========================================
-// CATALOGUE & CART (CALCULATOR TAB)
+// CATALOG (CALCULATOR TAB)
 // ==========================================
-
-// Render left product grid catalog
 function renderCatalog() {
     const searchVal = document.getElementById('catalog-search').value.toLowerCase();
-    const brandTabs = document.getElementById('catalog-brand-tabs');
-    let activeBrandTab = 'all';
-    
-    const activeTabBtn = brandTabs ? brandTabs.querySelector('.brand-tab.active') : null;
-    if (activeTabBtn) {
-        activeBrandTab = activeTabBtn.getAttribute('data-brand').toLowerCase();
-    }
-    
+    const activeTab = document.getElementById('catalog-brand-tabs')?.querySelector('.brand-tab.active');
+    const activeBrand = activeTab ? activeTab.getAttribute('data-brand').toLowerCase() : 'all';
     const container = document.getElementById('catalog-container');
     container.innerHTML = '';
-    
-    // Filter products
+
     const filtered = products.filter(p => {
-        const matchesSearch = p.name.toLowerCase().includes(searchVal) || p.brand.toLowerCase().includes(searchVal);
-        
-        let matchesBrand = false;
-        if (activeBrandTab === 'all') {
-            matchesBrand = true;
-        } else if (activeBrandTab === 'other') {
-            matchesBrand = !brands.some(b => b.toLowerCase() === p.brand.toLowerCase());
-        } else {
-            matchesBrand = p.brand.toLowerCase() === activeBrandTab;
-        }
-        
-        return matchesSearch && matchesBrand;
+        const matchSearch = p.name.toLowerCase().includes(searchVal) || p.brand.toLowerCase().includes(searchVal);
+        let matchBrand = activeBrand === 'all' ||
+            (activeBrand === 'other' ? !brands.some(b => b.toLowerCase() === p.brand.toLowerCase()) : p.brand.toLowerCase() === activeBrand);
+        return matchSearch && matchBrand;
     });
-    
+
     if (filtered.length === 0) {
-        container.innerHTML = `
-            <div class="empty-cart-placeholder" style="grid-column: 1/-1;">
-                <i data-lucide="package-search"></i>
-                <p>No products match your selection. ${products.length === 0 ? 'Go to Inventory and add some products!' : ''}</p>
-            </div>
-        `;
+        container.innerHTML = `<div class="empty-cart-placeholder" style="grid-column:1/-1"><i data-lucide="package-search"></i><p>No products found. ${products.length === 0 ? 'Add products in Inventory first!' : 'Try a different filter.'}</p></div>`;
         lucide.createIcons();
         return;
     }
-    
+
     filtered.forEach(p => {
-        const isOutOfStock = p.stock <= 0;
-        let stockBadgeText = 'In Stock';
-        let stockBadgeClass = 'in-stock';
-        
-        if (p.stock === 0) {
-            stockBadgeText = 'Out of Stock';
-            stockBadgeClass = 'out-stock';
-        } else if (p.stock <= p.alertLevel) {
-            stockBadgeText = `Low: ${p.stock} left`;
-            stockBadgeClass = 'low-stock';
-        }
-        
-        let brandClass = 'other';
-        if (p.brand.toLowerCase() === 'sigiri') brandClass = 'sigiri';
-        else if (p.brand.toLowerCase() === 'rhino') brandClass = 'rhino';
-        
+        const oos = p.stock <= 0;
+        let badgeTxt = 'In Stock', badgeCls = 'in-stock';
+        if (p.stock === 0)               { badgeTxt = 'Out of Stock'; badgeCls = 'out-stock'; }
+        else if (p.stock <= p.alertLevel){ badgeTxt = `Low: ${p.stock} left`; badgeCls = 'low-stock'; }
+
+        let brandCls = p.brand.toLowerCase() === 'sigiri' ? 'sigiri' : p.brand.toLowerCase() === 'rhino' ? 'rhino' : 'other';
+
         const card = document.createElement('div');
-        card.className = `product-card ${isOutOfStock ? 'out-of-stock-card' : ''}`;
+        card.className = `product-card ${oos ? 'out-of-stock-card' : ''}`;
         card.innerHTML = `
-            <span class="card-brand-badge ${brandClass}">${p.brand}</span>
+            <span class="card-brand-badge ${brandCls}">${p.brand}</span>
             <h4>${p.name}</h4>
             <div class="price-box">
                 <div class="price-row-item text-muted">
                     <span>Buying cost:</span>
-                    <span class="val">LKR ${p.buyingPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    <span class="val">LKR ${p.buyingPrice.toLocaleString('en-US',{minimumFractionDigits:2})}</span>
                 </div>
                 <div class="price-row-item">
                     <span>Selling price:</span>
-                    <span class="val text-navy">LKR ${p.sellingPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    <span class="val text-navy">LKR ${p.sellingPrice.toLocaleString('en-US',{minimumFractionDigits:2})}</span>
                 </div>
             </div>
-            <span class="stock-indicator-badge ${stockBadgeClass}">${stockBadgeText}</span>
+            <span class="stock-indicator-badge ${badgeCls}">${badgeTxt}</span>
             <div class="card-actions">
-                <button class="btn-add-cart" data-id="${p.id}" ${isOutOfStock ? 'disabled' : ''}>
+                <button class="btn-add-cart" data-id="${p.id}" ${oos ? 'disabled' : ''}>
                     <i data-lucide="plus"></i> Add to Calc
                 </button>
-            </div>
-        `;
-        
+            </div>`;
         container.appendChild(card);
-        
-        card.querySelector('.btn-add-cart').addEventListener('click', () => {
-            addToCart(p.id);
-        });
+        if (!oos) card.querySelector('.btn-add-cart').addEventListener('click', () => addToCart(p.id));
     });
-    
     lucide.createIcons();
 }
 
 // ==========================================
-// INVENTORY MANAGEMENT TAB
+// CART FUNCTIONS
 // ==========================================
+function addToCart(productId) {
+    const prod = products.find(p => p.id === productId);
+    if (!prod) return;
 
-function renderInventory() {
-    const searchVal = document.getElementById('inventory-search').value.toLowerCase();
-    const brandVal = document.getElementById('inventory-filter-brand').value;
-    const tableBody = document.getElementById('inventory-table-body');
-    
-    tableBody.innerHTML = '';
-    
-    // Filter
-    const filtered = products.filter(p => {
-        const matchesSearch = p.name.toLowerCase().includes(searchVal) || p.brand.toLowerCase().includes(searchVal);
-        
-        let matchesBrand = false;
-        if (brandVal === 'all') {
-            matchesBrand = true;
-        } else if (brandVal === 'Other') {
-            matchesBrand = !brands.some(b => b.toLowerCase() === p.brand.toLowerCase());
+    const existing = cart.find(c => c.productId === productId);
+    if (existing) {
+        if (existing.qty < prod.stock) {
+            existing.qty++;
+            showToast(`${prod.name} quantity increased`, 'info');
         } else {
-            matchesBrand = p.brand === brandVal;
+            showToast(`Not enough stock! Only ${prod.stock} available.`, 'warning');
+            return;
         }
-        
-        return matchesSearch && matchesBrand;
-    });
-    
-    if (filtered.length === 0) {
-        tableBody.innerHTML = `
-            <tr>
-                <td colspan="8" class="text-center" style="color: var(--text-muted); padding: 40px;">
-                    <i data-lucide="package-x" style="width:32px; height:32px; display:block; margin: 0 auto 10px;"></i>
-                    No products found in inventory. ${products.length === 0 ? 'Click "Add New Product" or "Add Stock Lot" to get started!' : ''}
-                </td>
-            </tr>
-        `;
+    } else {
+        cart.push({ productId, name: prod.name, brand: prod.brand, buyingPrice: prod.buyingPrice, sellingPrice: prod.sellingPrice, qty: 1, itemDiscount: 0, itemDiscountType: 'flat' });
+    }
+    renderCart();
+}
+
+function removeFromCart(productId) {
+    cart = cart.filter(c => c.productId !== productId);
+    renderCart();
+}
+
+function renderCart() {
+    const container = document.getElementById('cart-items-container');
+    container.innerHTML = '';
+
+    if (cart.length === 0) {
+        container.innerHTML = `<div class="empty-cart-placeholder"><i data-lucide="shopping-cart"></i><p>Cart is empty. Select a product from the catalog.</p></div>`;
         lucide.createIcons();
+        calculateCartTotals();
         return;
     }
-    
-    filtered.forEach(p => {
-        const isOutOfStock = p.stock === 0;
-        const isLowStock = p.stock <= p.alertLevel;
-        
-        let statusBadge = `<span class="badge badge-success">In Stock</span>`;
-        if (isOutOfStock) {
-            statusBadge = `<span class="badge badge-danger">Out of Stock</span>`;
-        } else if (isLowStock) {
-            statusBadge = `<span class="badge badge-warning">Low Stock</span>`;
-        }
-        
-        const row = document.createElement('tr');
+
+    cart.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.className = 'cart-item';
         row.innerHTML = `
-            <td><strong>${p.name}</strong></td>
-            <td><span class="badge badge-secondary">${p.brand}</span></td>
-            <td class="text-right">LKR ${p.buyingPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-            <td class="text-right">LKR ${p.sellingPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-            <td class="text-right"><strong>${p.stock}</strong></td>
-            <td class="text-center">${p.alertLevel}</td>
-            <td>${statusBadge}</td>
-            <td class="text-center">
-                <div class="table-row-actions">
-                    <button class="btn-icon edit-prod-btn" data-id="${p.id}" title="Edit product details">
-                        <i data-lucide="edit"></i>
-                    </button>
-                    <button class="btn-icon delete-prod-btn delete-action" data-id="${p.id}" title="Delete product">
-                        <i data-lucide="trash-2"></i>
-                    </button>
+            <div class="cart-item-details">
+                <strong>${item.name}</strong>
+                <small class="text-muted">${item.brand} &bull; LKR ${item.sellingPrice.toLocaleString('en-US',{minimumFractionDigits:2})} each</small>
+            </div>
+            <div class="cart-item-controls">
+                <div class="qty-control">
+                    <button type="button" class="qty-btn qty-minus" data-idx="${idx}">-</button>
+                    <input type="number" class="qty-input" value="${item.qty}" min="1" data-idx="${idx}" style="width:52px;text-align:center;border:1px solid var(--border);border-radius:4px;padding:4px;">
+                    <button type="button" class="qty-btn qty-plus" data-idx="${idx}">+</button>
                 </div>
-            </td>
-        `;
-        tableBody.appendChild(row);
-        
-        row.querySelector('.edit-prod-btn').addEventListener('click', () => {
-            editProductModal(p.id);
-        });
-        
-        row.querySelector('.delete-prod-btn').addEventListener('click', () => {
-            deleteProduct(p.id);
+                <div class="item-discount-control" style="display:flex;gap:4px;align-items:center;">
+                    <input type="number" class="item-disc-val" value="${item.itemDiscount}" min="0" placeholder="Disc" data-idx="${idx}" style="width:60px;border:1px solid var(--border);border-radius:4px;padding:4px;font-size:12px;">
+                    <select class="item-disc-type" data-idx="${idx}" style="border:1px solid var(--border);border-radius:4px;padding:4px;font-size:12px;font-family:inherit;">
+                        <option value="flat"   ${item.itemDiscountType==='flat'  ?'selected':''}>LKR</option>
+                        <option value="percent"${item.itemDiscountType==='percent'?'selected':''}>%</option>
+                    </select>
+                </div>
+                <button type="button" class="btn-icon delete-action remove-cart-item" data-idx="${idx}" style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:transparent;cursor:pointer;">
+                    <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+                </button>
+            </div>`;
+        container.appendChild(row);
+    });
+
+    lucide.createIcons();
+
+    // Bind controls
+    container.querySelectorAll('.qty-minus').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const idx = parseInt(btn.getAttribute('data-idx'));
+            if (cart[idx].qty > 1) { cart[idx].qty--; renderCart(); }
         });
     });
-    
+    container.querySelectorAll('.qty-plus').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const idx = parseInt(btn.getAttribute('data-idx'));
+            const prod = products.find(p => p.id === cart[idx].productId);
+            if (prod && cart[idx].qty < prod.stock) { cart[idx].qty++; renderCart(); }
+            else showToast('Not enough stock!', 'warning');
+        });
+    });
+    container.querySelectorAll('.qty-input').forEach(inp => {
+        inp.addEventListener('change', () => {
+            const idx = parseInt(inp.getAttribute('data-idx'));
+            const prod = products.find(p => p.id === cart[idx].productId);
+            let val = parseInt(inp.value) || 1;
+            if (val < 1) val = 1;
+            if (prod && val > prod.stock) { val = prod.stock; showToast('Not enough stock!', 'warning'); }
+            cart[idx].qty = val;
+            renderCart();
+        });
+    });
+    container.querySelectorAll('.item-disc-val').forEach(inp => {
+        inp.addEventListener('input', () => {
+            const idx = parseInt(inp.getAttribute('data-idx'));
+            cart[idx].itemDiscount = parseFloat(inp.value) || 0;
+            calculateCartTotals();
+        });
+    });
+    container.querySelectorAll('.item-disc-type').forEach(sel => {
+        sel.addEventListener('change', () => {
+            const idx = parseInt(sel.getAttribute('data-idx'));
+            cart[idx].itemDiscountType = sel.value;
+            calculateCartTotals();
+        });
+    });
+    container.querySelectorAll('.remove-cart-item').forEach(btn => {
+        btn.addEventListener('click', () => removeFromCart(cart[parseInt(btn.getAttribute('data-idx'))].productId));
+    });
+
+    calculateCartTotals();
+}
+
+function calculateCartTotals() {
+    let subtotal = 0, totalCost = 0, itemDiscountTotal = 0;
+
+    cart.forEach(item => {
+        const lineSubtotal = item.sellingPrice * item.qty;
+        const lineCost     = item.buyingPrice  * item.qty;
+        let   lineDisc     = 0;
+
+        if (item.itemDiscountType === 'flat')    lineDisc = item.itemDiscount * item.qty;
+        else if (item.itemDiscountType === 'percent') lineDisc = lineSubtotal * (item.itemDiscount / 100);
+
+        subtotal         += lineSubtotal;
+        totalCost        += lineCost;
+        itemDiscountTotal+= lineDisc;
+    });
+
+    const extraDiscVal  = parseFloat(document.getElementById('extra-discount-val').value)  || 0;
+    const extraDiscType = document.getElementById('extra-discount-type').value;
+    let   extraDiscount = 0;
+    if (extraDiscType === 'flat')    extraDiscount = extraDiscVal;
+    else if (extraDiscType === 'percent') extraDiscount = subtotal * (extraDiscVal / 100);
+
+    const totalDiscount = itemDiscountTotal + extraDiscount;
+    const grandTotal    = Math.max(0, subtotal - totalDiscount);
+    const netProfit     = grandTotal - totalCost;
+    const profitMargin  = grandTotal > 0 ? (netProfit / grandTotal) * 100 : 0;
+
+    // Customer view
+    document.getElementById('cust-subtotal').textContent = `LKR ${subtotal.toLocaleString('en-US',{minimumFractionDigits:2})}`;
+    document.getElementById('cust-discount').textContent = `- LKR ${totalDiscount.toLocaleString('en-US',{minimumFractionDigits:2})}`;
+    document.getElementById('cust-grand-total').textContent = `LKR ${grandTotal.toLocaleString('en-US',{minimumFractionDigits:2})}`;
+
+    // Internal view
+    document.getElementById('int-subtotal').textContent    = `LKR ${subtotal.toLocaleString('en-US',{minimumFractionDigits:2})}`;
+    document.getElementById('int-total-cost').textContent  = `LKR ${totalCost.toLocaleString('en-US',{minimumFractionDigits:2})}`;
+    document.getElementById('int-discount').textContent    = `- LKR ${totalDiscount.toLocaleString('en-US',{minimumFractionDigits:2})}`;
+    document.getElementById('int-grand-total').textContent = `LKR ${grandTotal.toLocaleString('en-US',{minimumFractionDigits:2})}`;
+    document.getElementById('int-net-profit').textContent  = `LKR ${netProfit.toLocaleString('en-US',{minimumFractionDigits:2})}`;
+    document.getElementById('int-profit-margin').textContent = `${profitMargin.toFixed(1)}%`;
+
+    // Colour profit
+    const profitEl = document.getElementById('int-net-profit');
+    profitEl.style.color = netProfit >= 0 ? 'var(--success)' : 'var(--secondary)';
+
+    return { subtotal, totalCost, totalDiscount, grandTotal, netProfit, profitMargin };
+}
+
+function checkoutQuotation() {
+    if (cart.length === 0) { showToast('Cart is empty!', 'warning'); return; }
+    const totals = calculateCartTotals();
+
+    // Check stock availability
+    for (const item of cart) {
+        const prod = products.find(p => p.id === item.productId);
+        if (!prod || prod.stock < item.qty) {
+            showToast(`Insufficient stock for ${item.name}!`, 'danger'); return;
+        }
+    }
+
+    // Deduct stock
+    const saleItems = cart.map(item => {
+        const prod = products.find(p => p.id === item.productId);
+        prod.stock -= item.qty;
+        const lineSubtotal = item.sellingPrice * item.qty;
+        let lineDisc = item.itemDiscountType === 'flat' ? item.itemDiscount * item.qty : lineSubtotal * (item.itemDiscount / 100);
+        return {
+            productId: item.productId,
+            name: item.name,
+            brand: item.brand,
+            buyingPrice: item.buyingPrice,
+            sellingPrice: item.sellingPrice,
+            qty: item.qty,
+            itemDiscount: lineDisc,
+            finalPrice: lineSubtotal - lineDisc
+        };
+    });
+    saveProducts();
+
+    const saleId = 'INV-' + Date.now().toString().slice(-6);
+    const saleLog = { id: saleId, timestamp: new Date().toISOString(), items: saleItems, totals };
+    salesLogs.unshift(saleLog);
+    saveSales();
+
+    // Print invoice
+    populateInvoiceForPrint(saleLog);
+
+    cart = [];
+    document.getElementById('extra-discount-val').value = 0;
+    renderCart();
+    renderCatalog();
+    renderDashboard();
+    showToast(`Sale ${saleId} completed! Printing invoice...`, 'success');
+    setTimeout(() => window.print(), 400);
+}
+
+function triggerInvoicePrint() {
+    if (cart.length === 0) { showToast('Cart is empty — nothing to print!', 'warning'); return; }
+    const totals = calculateCartTotals();
+    const previewLog = {
+        id: 'QUOTE-' + Date.now().toString().slice(-6),
+        timestamp: new Date().toISOString(),
+        items: cart.map(item => {
+            const lineSubtotal = item.sellingPrice * item.qty;
+            const lineDisc = item.itemDiscountType === 'flat' ? item.itemDiscount * item.qty : lineSubtotal * (item.itemDiscount / 100);
+            return { productId: item.productId, name: item.name, brand: item.brand, buyingPrice: item.buyingPrice, sellingPrice: item.sellingPrice, qty: item.qty, itemDiscount: lineDisc, finalPrice: lineSubtotal - lineDisc };
+        }),
+        totals
+    };
+    populateInvoiceForPrint(previewLog);
+    window.print();
+}
+
+function populateInvoiceForPrint(log) {
+    const dateObj = new Date(log.timestamp);
+    document.getElementById('print-inv-id').textContent   = log.id;
+    document.getElementById('print-inv-date').textContent = dateObj.toLocaleString('en-US',{ year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
+
+    const rowsCont = document.getElementById('print-invoice-rows');
+    rowsCont.innerHTML = '';
+    log.items.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${item.name}</td>
+            <td>${item.brand}</td>
+            <td class="text-right">LKR ${item.sellingPrice.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+            <td class="text-right">${item.qty}</td>
+            <td class="text-right">${item.itemDiscount > 0 ? 'LKR ' + item.itemDiscount.toLocaleString('en-US',{minimumFractionDigits:2}) : '-'}</td>
+            <td class="text-right">LKR ${item.finalPrice.toLocaleString('en-US',{minimumFractionDigits:2})}</td>`;
+        rowsCont.appendChild(tr);
+    });
+
+    document.getElementById('print-subtotal').textContent = `LKR ${log.totals.subtotal.toLocaleString('en-US',{minimumFractionDigits:2})}`;
+    const discRow = document.getElementById('print-discount-row');
+    if (log.totals.totalDiscount > 0) {
+        discRow.style.display = 'table-row';
+        document.getElementById('print-discount').textContent = `- LKR ${log.totals.totalDiscount.toLocaleString('en-US',{minimumFractionDigits:2})}`;
+    } else {
+        discRow.style.display = 'none';
+    }
+    document.getElementById('print-total').textContent = `LKR ${log.totals.grandTotal.toLocaleString('en-US',{minimumFractionDigits:2})}`;
+}
+
+// ==========================================
+// INVENTORY TAB
+// ==========================================
+function renderInventory() {
+    const searchVal = document.getElementById('inventory-search').value.toLowerCase();
+    const brandVal  = document.getElementById('inventory-filter-brand').value;
+    const tbody     = document.getElementById('inventory-table-body');
+    tbody.innerHTML = '';
+
+    const filtered = products.filter(p => {
+        const matchSearch = p.name.toLowerCase().includes(searchVal) || p.brand.toLowerCase().includes(searchVal);
+        const matchBrand  = brandVal === 'all' ? true : brandVal === 'Other' ? !brands.some(b => b.toLowerCase() === p.brand.toLowerCase()) : p.brand === brandVal;
+        return matchSearch && matchBrand;
+    });
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding:40px;color:var(--text-muted);">
+            <i data-lucide="package-x" style="width:32px;height:32px;display:block;margin:0 auto 10px;"></i>
+            No products found. ${products.length === 0 ? 'Click "Add Stock Lot" or "Add New Product" to get started!' : ''}
+        </td></tr>`;
+        lucide.createIcons(); return;
+    }
+
+    filtered.forEach(p => {
+        let badge = `<span class="badge badge-success">In Stock</span>`;
+        if (p.stock === 0)                 badge = `<span class="badge badge-danger">Out of Stock</span>`;
+        else if (p.stock <= p.alertLevel)  badge = `<span class="badge badge-warning">Low Stock</span>`;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${p.name}</strong></td>
+            <td><span class="badge badge-secondary">${p.brand}</span></td>
+            <td class="text-right">LKR ${p.buyingPrice.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+            <td class="text-right">LKR ${p.sellingPrice.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+            <td class="text-right"><strong>${p.stock}</strong></td>
+            <td class="text-center">${p.alertLevel}</td>
+            <td>${badge}</td>
+            <td class="text-center">
+                <div class="table-row-actions">
+                    <button class="btn-icon edit-prod-btn"   data-id="${p.id}" title="Edit"><i data-lucide="edit"></i></button>
+                    <button class="btn-icon delete-prod-btn delete-action" data-id="${p.id}" title="Delete"><i data-lucide="trash-2"></i></button>
+                </div>
+            </td>`;
+        tbody.appendChild(tr);
+        tr.querySelector('.edit-prod-btn').addEventListener('click', () => editProductModal(p.id));
+        tr.querySelector('.delete-prod-btn').addEventListener('click', () => deleteProduct(p.id));
+    });
     lucide.createIcons();
 }
 
-// Open modal for editing existing sheet
 function editProductModal(productId) {
     const prod = products.find(p => p.id === productId);
     if (!prod) return;
-    
     document.getElementById('modal-product-title').textContent = 'Edit Roofing Sheet Details';
-    document.getElementById('product-id-val').value = prod.id;
-    document.getElementById('product-name-val').value = prod.name;
-    
+    document.getElementById('product-id-val').value    = prod.id;
+    document.getElementById('product-name-val').value  = prod.name;
     renderBrandControls();
-    document.getElementById('product-brand-val').value = prod.brand;
-    
-    document.getElementById('product-buying-val').value = prod.buyingPrice;
+    document.getElementById('product-brand-val').value   = prod.brand;
+    document.getElementById('product-buying-val').value  = prod.buyingPrice;
     document.getElementById('product-selling-val').value = prod.sellingPrice;
-    document.getElementById('product-stock-val').value = prod.stock;
-    document.getElementById('product-alert-val').value = prod.alertLevel;
-    
+    document.getElementById('product-stock-val').value   = prod.stock;
+    document.getElementById('product-alert-val').value   = prod.alertLevel;
     document.getElementById('product-modal').classList.add('active');
 }
 
-// Save adding or editing product details
 function saveProductFromForm() {
-    const id = document.getElementById('product-id-val').value;
-    const name = document.getElementById('product-name-val').value;
-    const brand = document.getElementById('product-brand-val').value;
-    const buyingPrice = parseFloat(document.getElementById('product-buying-val').value) || 0;
+    const id           = document.getElementById('product-id-val').value;
+    const name         = document.getElementById('product-name-val').value.trim();
+    const brand        = document.getElementById('product-brand-val').value;
+    const buyingPrice  = parseFloat(document.getElementById('product-buying-val').value)  || 0;
     const sellingPrice = parseFloat(document.getElementById('product-selling-val').value) || 0;
-    const stock = parseInt(document.getElementById('product-stock-val').value) || 0;
-    const alertLevel = parseInt(document.getElementById('product-alert-val').value) || 10;
-    
+    const stock        = parseInt(document.getElementById('product-stock-val').value)      || 0;
+    const alertLevel   = parseInt(document.getElementById('product-alert-val').value)      || 10;
+
     if (id) {
-        // Edit mode
-        const index = products.findIndex(p => p.id === id);
-        if (index !== -1) {
-            products[index] = { id, name, brand, buyingPrice, sellingPrice, stock, alertLevel };
-            showToast('Product updated successfully!');
-        }
+        const idx = products.findIndex(p => p.id === id);
+        if (idx !== -1) { products[idx] = { id, name, brand, buyingPrice, sellingPrice, stock, alertLevel }; }
+        showToast('Product updated!');
     } else {
-        // Create mode
-        const newId = 'prod_' + Date.now();
-        products.push({ id: newId, name, brand, buyingPrice, sellingPrice, stock, alertLevel });
-        showToast('New product added to inventory!');
+        products.push({ id: 'prod_' + Date.now(), name, brand, buyingPrice, sellingPrice, stock, alertLevel });
+        showToast('Product added!');
     }
-    
     saveProducts();
     renderInventory();
     renderCatalog();
 }
 
-// Delete product
 function deleteProduct(productId) {
     const prod = products.find(p => p.id === productId);
     if (!prod) return;
-    
-    if (confirm(`Are you sure you want to delete ${prod.name} from inventory?`)) {
+    if (confirm(`Delete "${prod.name}" from inventory?`)) {
         products = products.filter(p => p.id !== productId);
         saveProducts();
         renderInventory();
         renderCatalog();
-        showToast('Product deleted from database', 'warning');
+        showToast('Product deleted', 'warning');
     }
 }
 
-// Download inventory details as Excel CSV report
 function downloadInventoryCSV() {
-    if (products.length === 0) {
-        showToast('No inventory data to export!', 'warning');
-        return;
-    }
-    
-    let csvContent = "\uFEFF"; // UTF-8 BOM
-    csvContent += "Product ID,Product Name,Brand,Buying Price (Cost LKR),Selling Price (LKR),Current Stock,Min Stock Alert,Total Stock Value (Cost LKR),Total Stock Value (Selling LKR)\r\n";
-    
+    if (products.length === 0) { showToast('No inventory to export!', 'warning'); return; }
+    let csv = "\uFEFFProduct Name,Brand,Buying Price (LKR),Selling Price (LKR),Stock,Min Alert,Cost Value (LKR),Selling Value (LKR)\r\n";
     products.forEach(p => {
-        const valCost = p.buyingPrice * p.stock;
-        const valSelling = p.sellingPrice * p.stock;
-        const row = `"${p.id}","${p.name.replace(/"/g, '""')}","${p.brand}",${p.buyingPrice},${p.sellingPrice},${p.stock},${p.alertLevel},${valCost},${valSelling}`;
-        csvContent += row + "\r\n";
+        csv += `"${p.name.replace(/"/g,'""')}","${p.brand}",${p.buyingPrice},${p.sellingPrice},${p.stock},${p.alertLevel},${p.buyingPrice*p.stock},${p.sellingPrice*p.stock}\r\n`;
     });
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `perera_inventory_report_${new Date().toISOString().split('T')[0]}.csv`;
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    showToast('Inventory spreadsheet downloaded!');
+    downloadBlob(csv, `perera_inventory_${todayStr()}.csv`, 'text/csv');
+    showToast('Inventory CSV downloaded!');
 }
 
 // ==========================================
-// SALES HISTORIES & LOGS
+// SALES LOGS TAB
 // ==========================================
-
 function renderSalesLogs() {
     const searchVal = document.getElementById('sales-search').value.toLowerCase();
-    const dateVal = document.getElementById('sales-filter-date').value;
-    const tableBody = document.getElementById('sales-table-body');
-    
-    tableBody.innerHTML = '';
-    
-    // Filter
+    const dateVal   = document.getElementById('sales-filter-date').value;
+    const tbody     = document.getElementById('sales-table-body');
+    tbody.innerHTML = '';
+
     const filtered = salesLogs.filter(log => {
-        const matchesSearch = log.id.toLowerCase().includes(searchVal) || 
-                              log.items.some(item => item.name.toLowerCase().includes(searchVal));
-                              
-        let matchesDate = true;
-        if (dateVal) {
-            const logDate = log.timestamp.split('T')[0];
-            matchesDate = logDate === dateVal;
-        }
-        
-        return matchesSearch && matchesDate;
+        const matchSearch = log.id.toLowerCase().includes(searchVal) || log.items.some(i => i.name.toLowerCase().includes(searchVal));
+        const matchDate   = dateVal ? log.timestamp.split('T')[0] === dateVal : true;
+        return matchSearch && matchDate;
     });
-    
+
     calculateSalesBubbles();
-    
+
     if (filtered.length === 0) {
-        tableBody.innerHTML = `
-            <tr>
-                <td colspan="8" class="text-center" style="color: var(--text-muted); padding: 40px;">
-                    <i data-lucide="receipt-text" style="width:32px; height:32px; display:block; margin: 0 auto 10px;"></i>
-                    No sales logs found
-                </td>
-            </tr>
-        `;
-        lucide.createIcons();
-        return;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding:40px;color:var(--text-muted);">
+            <i data-lucide="receipt-text" style="width:32px;height:32px;display:block;margin:0 auto 10px;"></i>No sales logs found.
+        </td></tr>`;
+        lucide.createIcons(); return;
     }
-    
+
     filtered.forEach(log => {
-        const dateObj = new Date(log.timestamp);
-        const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + 
-                              ' ' + dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                              
-        const productsSummary = log.items.map(item => `${item.name} (${item.qty})`).join(', ');
-        
-        const row = document.createElement('tr');
-        row.innerHTML = `
+        const d = new Date(log.timestamp);
+        const dateStr = d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + ' ' + d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+        const summary = log.items.map(i => `${i.name} (${i.qty})`).join(', ');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
             <td><strong>${log.id}</strong></td>
-            <td><span class="text-muted" style="font-size:12px;">${formattedDate}</span></td>
-            <td><div style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${productsSummary}">${productsSummary}</div></td>
-            <td class="text-right">LKR ${log.totals.totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-            <td class="text-right" style="font-weight: 700;">LKR ${log.totals.grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-            <td class="text-right text-secondary">LKR ${log.totals.totalDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-            <td class="text-right text-success-highlight" style="font-weight: 700;">LKR ${log.totals.netProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+            <td><span class="text-muted" style="font-size:12px;">${dateStr}</span></td>
+            <td><div style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${summary}">${summary}</div></td>
+            <td class="text-right">LKR ${log.totals.totalCost.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+            <td class="text-right" style="font-weight:700;">LKR ${log.totals.grandTotal.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+            <td class="text-right text-secondary">LKR ${log.totals.totalDiscount.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+            <td class="text-right" style="font-weight:700;color:var(--success);">LKR ${log.totals.netProfit.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
             <td class="text-center">
                 <div class="table-row-actions">
-                    <button class="btn-icon reprint-sale-btn" data-id="${log.id}" title="Re-print Invoice">
-                        <i data-lucide="printer"></i>
-                    </button>
-                    <button class="btn-icon refund-sale-btn delete-action" data-id="${log.id}" title="Refund/Cancel Transaction">
-                        <i data-lucide="corner-up-left"></i>
-                    </button>
+                    <button class="btn-icon reprint-btn" data-id="${log.id}" title="Reprint"><i data-lucide="printer"></i></button>
+                    <button class="btn-icon delete-action refund-btn" data-id="${log.id}" title="Refund"><i data-lucide="corner-up-left"></i></button>
                 </div>
-            </td>
-        `;
-        tableBody.appendChild(row);
-        
-        row.querySelector('.reprint-sale-btn').addEventListener('click', () => {
-            reprintInvoice(log.id);
-        });
-        
-        row.querySelector('.refund-sale-btn').addEventListener('click', () => {
-            refundSale(log.id);
-        });
+            </td>`;
+        tbody.appendChild(tr);
+        tr.querySelector('.reprint-btn').addEventListener('click', () => reprintInvoice(log.id));
+        tr.querySelector('.refund-btn').addEventListener('click', () => refundSale(log.id));
     });
-    
     lucide.createIcons();
 }
 
-// Calculate the summary bubble cards in the top header of sales history
 function calculateSalesBubbles() {
-    let today = 0;
-    let week = 0;
-    let month = 0;
-    let total = 0;
-    
+    let today=0, week=0, month=0, total=0;
     const now = new Date();
-    
     salesLogs.forEach(log => {
-        const logDate = new Date(log.timestamp);
-        const profit = log.totals.netProfit;
-        
-        total += profit;
-        
-        if (logDate.toDateString() === now.toDateString()) {
-            today += profit;
-        }
-        
-        const msDiff = now.getTime() - logDate.getTime();
-        const daysDiff = msDiff / (1000 * 3600 * 24);
-        if (daysDiff <= 7) {
-            week += profit;
-        }
-        
-        if (logDate.getMonth() === now.getMonth() && logDate.getFullYear() === now.getFullYear()) {
-            month += profit;
-        }
+        const d = new Date(log.timestamp), p = log.totals.netProfit;
+        total += p;
+        if (d.toDateString() === now.toDateString()) today += p;
+        if ((now - d) / 864e5 <= 7) week += p;
+        if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) month += p;
     });
-    
-    document.getElementById('stat-today-profit').textContent = `LKR ${today.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-    document.getElementById('stat-week-profit').textContent = `LKR ${week.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-    document.getElementById('stat-month-profit').textContent = `LKR ${month.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-    document.getElementById('stat-total-profit').textContent = `LKR ${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    const fmt = v => `LKR ${v.toLocaleString('en-US',{minimumFractionDigits:2})}`;
+    document.getElementById('stat-today-profit').textContent = fmt(today);
+    document.getElementById('stat-week-profit').textContent  = fmt(week);
+    document.getElementById('stat-month-profit').textContent = fmt(month);
+    document.getElementById('stat-total-profit').textContent = fmt(total);
 }
 
-// Re-print invoice from historical logs
 function reprintInvoice(saleId) {
     const log = salesLogs.find(l => l.id === saleId);
     if (!log) return;
-    
-    const totals = log.totals;
-    const dateObj = new Date(log.timestamp);
-    const dateStr = dateObj.toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    
-    // Populate printable elements
-    document.getElementById('print-inv-id').textContent = log.id;
-    document.getElementById('print-inv-date').textContent = dateStr;
-    
-    const rowsContainer = document.getElementById('print-invoice-rows');
-    rowsContainer.innerHTML = '';
-    
-    log.items.forEach(item => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${item.name}</td>
-            <td>${item.brand}</td>
-            <td class="text-right">LKR ${item.sellingPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-            <td class="text-right">${item.qty}</td>
-            <td class="text-right">${item.itemDiscount > 0 ? 'LKR ' + item.itemDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : '-'}</td>
-            <td class="text-right">LKR ${item.finalPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-        `;
-        rowsContainer.appendChild(row);
-    });
-    
-    document.getElementById('print-subtotal').textContent = `LKR ${totals.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-    
-    const discountRow = document.getElementById('print-discount-row');
-    if (totals.totalDiscount > 0) {
-        discountRow.style.display = 'table-row';
-        document.getElementById('print-discount').textContent = `-LKR ${totals.totalDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-    } else {
-        discountRow.style.display = 'none';
-    }
-    
-    document.getElementById('print-total').textContent = `LKR ${totals.grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-    
+    populateInvoiceForPrint(log);
     window.print();
 }
 
-// Refund sale transaction & return stock back to inventory database
 function refundSale(saleId) {
     const log = salesLogs.find(l => l.id === saleId);
     if (!log) return;
-    
-    if (confirm(`Are you sure you want to refund/cancel sale ${saleId}? This will return all quantities back to the stock inventory.`)) {
-        // Return stock
+    if (confirm(`Refund sale ${saleId}? Stock will be restored.`)) {
         log.items.forEach(item => {
             const prod = products.find(p => p.id === item.productId);
-            if (prod) {
-                prod.stock += item.qty;
-            }
+            if (prod) prod.stock += item.qty;
         });
         saveProducts();
-        
-        // Remove log
         salesLogs = salesLogs.filter(l => l.id !== saleId);
         saveSales();
-        
         renderSalesLogs();
-        showToast(`Transaction ${saleId} refunded. Stock restored.`, 'info');
+        showToast(`${saleId} refunded. Stock restored.`, 'info');
     }
 }
 
-// Download sales log as Excel CSV report
 function downloadSalesCSV() {
-    if (salesLogs.length === 0) {
-        showToast('No sales records to export!', 'warning');
-        return;
-    }
-    
-    let csvContent = "\uFEFF"; // UTF-8 BOM
-    csvContent += "Invoice ID,Date & Time,Products Sold (Qty),Total Buying Cost (LKR),Total Charged (Selling LKR),Discount Given (LKR),Net Profit (LKR),Margin %\r\n";
-    
+    if (salesLogs.length === 0) { showToast('No sales to export!', 'warning'); return; }
+    let csv = "\uFEFFInvoice ID,Date,Products,Cost (LKR),Revenue (LKR),Discount (LKR),Profit (LKR),Margin %\r\n";
     salesLogs.forEach(log => {
-        const dateObj = new Date(log.timestamp);
-        const formattedDate = dateObj.toLocaleDateString('en-US') + ' ' + dateObj.toLocaleTimeString('en-US');
-        const itemsSummary = log.items.map(item => `${item.name} (${item.qty})`).join('; ');
-        
-        const row = `"${log.id}","${formattedDate}","${itemsSummary.replace(/"/g, '""')}",${log.totals.totalCost},${log.totals.grandTotal},${log.totals.totalDiscount},${log.totals.netProfit},${log.totals.profitMargin.toFixed(2)}`;
-        csvContent += row + "\r\n";
+        const d = new Date(log.timestamp);
+        const items = log.items.map(i => `${i.name}(${i.qty})`).join('; ');
+        csv += `"${log.id}","${d.toLocaleDateString('en-US')} ${d.toLocaleTimeString('en-US')}","${items.replace(/"/g,'""')}",${log.totals.totalCost},${log.totals.grandTotal},${log.totals.totalDiscount},${log.totals.netProfit},${log.totals.profitMargin.toFixed(2)}\r\n`;
     });
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `perera_sales_report_${new Date().toISOString().split('T')[0]}.csv`;
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    showToast('Sales spreadsheet report downloaded!');
+    downloadBlob(csv, `perera_sales_${todayStr()}.csv`, 'text/csv');
+    showToast('Sales CSV downloaded!');
 }
 
 // ==========================================
-// DASHBOARD ANALYTICS PANEL
+// DASHBOARD
 // ==========================================
-
 function renderDashboard() {
-    let totalRevenue = 0;
-    let totalCostCovered = 0;
-    let totalProfit = 0;
-    
+    let totalRevenue=0, totalCost=0, totalProfit=0;
     salesLogs.forEach(log => {
         totalRevenue += log.totals.grandTotal;
-        totalCostCovered += log.totals.totalCost;
-        totalProfit += log.totals.netProfit;
+        totalCost    += log.totals.totalCost;
+        totalProfit  += log.totals.netProfit;
     });
-    
-    const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-    
-    // Populate KPIs
-    document.getElementById('kpi-revenue').textContent = `LKR ${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-    document.getElementById('kpi-cost').textContent = `LKR ${totalCostCovered.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-    document.getElementById('kpi-profit').textContent = `LKR ${totalProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-    document.getElementById('kpi-margin').textContent = `Profit Margin: ${profitMargin.toFixed(1)}%`;
+    const margin = totalRevenue > 0 ? (totalProfit/totalRevenue)*100 : 0;
+
+    document.getElementById('kpi-revenue').textContent    = `LKR ${totalRevenue.toLocaleString('en-US',{minimumFractionDigits:2})}`;
+    document.getElementById('kpi-cost').textContent       = `LKR ${totalCost.toLocaleString('en-US',{minimumFractionDigits:2})}`;
+    document.getElementById('kpi-profit').textContent     = `LKR ${totalProfit.toLocaleString('en-US',{minimumFractionDigits:2})}`;
+    document.getElementById('kpi-margin').textContent     = `Profit Margin: ${margin.toFixed(1)}%`;
     document.getElementById('kpi-sales-count').textContent = salesLogs.length;
-    
+
     renderStockAlerts();
     updateDashboardCharts('daily');
 }
 
 function renderStockAlerts() {
-    const alertsList = document.getElementById('stock-alerts-list');
-    alertsList.innerHTML = '';
-    
-    const lowStockItems = products.filter(p => p.stock <= p.alertLevel);
-    document.getElementById('alert-count-badge').textContent = lowStockItems.length;
-    
-    if (lowStockItems.length === 0) {
-        alertsList.innerHTML = `
-            <div class="no-alerts-placeholder">
-                <i data-lucide="check-circle-2"></i>
-                <p>All items are in stock. No alerts!</p>
-            </div>
-        `;
-        lucide.createIcons();
-        return;
+    const list  = document.getElementById('stock-alerts-list');
+    const badge = document.getElementById('alert-count-badge');
+    list.innerHTML = '';
+    const low = products.filter(p => p.stock <= p.alertLevel);
+    badge.textContent = low.length;
+
+    if (low.length === 0) {
+        list.innerHTML = `<div class="no-alerts-placeholder"><i data-lucide="check-circle-2"></i><p>All stock levels are fine!</p></div>`;
+        lucide.createIcons(); return;
     }
-    
-    lowStockItems.forEach(p => {
-        const isOutOfStock = p.stock === 0;
-        const alertEl = document.createElement('div');
-        alertEl.className = `alert-item ${isOutOfStock ? 'danger-item' : 'warning-item'}`;
-        
-        let iconName = 'alert-triangle';
-        let stockText = `${p.stock} sheets remaining in inventory`;
-        if (isOutOfStock) {
-            iconName = 'alert-octagon';
-            stockText = 'Out of Stock! Cannot make sales.';
-        }
-        
-        alertEl.innerHTML = `
-            <i data-lucide="${iconName}"></i>
+    low.forEach(p => {
+        const oos = p.stock === 0;
+        const el = document.createElement('div');
+        el.className = `alert-item ${oos ? 'danger-item' : 'warning-item'}`;
+        el.innerHTML = `
+            <i data-lucide="${oos ? 'alert-octagon' : 'alert-triangle'}"></i>
             <div class="alert-details">
                 <p>${p.name}</p>
-                <span>Brand: ${p.brand} | ${stockText}</span>
+                <span>${p.brand} &bull; ${oos ? 'Out of Stock!' : p.stock + ' sheets left'}</span>
             </div>
-            <button class="btn-primary" style="padding: 4px 8px; font-size: 11px; border-radius: 4px;" onclick="switchTab('inventory'); editProductModal('${p.id}');">
-                Restock
-            </button>
-        `;
-        alertsList.appendChild(alertEl);
+            <button class="btn-primary" style="padding:4px 8px;font-size:11px;border-radius:4px;" onclick="switchTab('inventory');editProductModal('${p.id}');">Restock</button>`;
+        list.appendChild(el);
     });
-    
     lucide.createIcons();
 }
 
-// Generate graphics using ChartJS CDN
 function updateDashboardCharts(period) {
     const ctx = document.getElementById('analytics-chart').getContext('2d');
-    
-    if (activeChart) {
-        activeChart.destroy();
-    }
-    
-    const labels = [];
-    const revenueData = [];
-    const profitData = [];
-    
+    if (activeChart) { activeChart.destroy(); activeChart = null; }
+
+    const labels=[], revenue=[], profit=[];
     const now = new Date();
-    
+
     if (period === 'daily') {
-        for (let i = 6; i >= 0; i--) {
-            const d = new Date();
-            d.setDate(now.getDate() - i);
-            const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            labels.push(dateStr);
-            
-            let dateRev = 0;
-            let dateProf = 0;
-            salesLogs.forEach(log => {
-                const logDate = new Date(log.timestamp);
-                if (logDate.toDateString() === d.toDateString()) {
-                    dateRev += log.totals.grandTotal;
-                    dateProf += log.totals.netProfit;
-                }
-            });
-            
-            revenueData.push(dateRev);
-            profitData.push(dateProf);
+        for (let i=6; i>=0; i--) {
+            const d = new Date(); d.setDate(now.getDate()-i);
+            labels.push(d.toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+            let r=0, p=0;
+            salesLogs.forEach(log => { if (new Date(log.timestamp).toDateString()===d.toDateString()) { r+=log.totals.grandTotal; p+=log.totals.netProfit; } });
+            revenue.push(r); profit.push(p);
         }
     } else if (period === 'weekly') {
-        for (let i = 3; i >= 0; i--) {
-            const labelStr = `Week -${i}`;
-            labels.push(i === 0 ? 'This Week' : labelStr);
-            
-            let weekRev = 0;
-            let weekProf = 0;
+        for (let i=3; i>=0; i--) {
+            labels.push(i===0 ? 'This Week' : `Week -${i}`);
+            let r=0, p=0;
             salesLogs.forEach(log => {
-                const logDate = new Date(log.timestamp);
-                const msDiff = now.getTime() - logDate.getTime();
-                const daysDiff = msDiff / (1000 * 3600 * 24);
-                
-                if (daysDiff >= i * 7 && daysDiff < (i + 1) * 7) {
-                    weekRev += log.totals.grandTotal;
-                    weekProf += log.totals.netProfit;
-                }
+                const diff=(now - new Date(log.timestamp))/864e5;
+                if (diff >= i*7 && diff < (i+1)*7) { r+=log.totals.grandTotal; p+=log.totals.netProfit; }
             });
-            
-            revenueData.push(weekRev);
-            profitData.push(weekProf);
+            revenue.push(r); profit.push(p);
         }
-    } else if (period === 'monthly') {
-        for (let i = 5; i >= 0; i--) {
-            const d = new Date();
-            d.setMonth(now.getMonth() - i);
-            const monthStr = d.toLocaleDateString('en-US', { month: 'short' });
-            labels.push(monthStr);
-            
-            let monthRev = 0;
-            let monthProf = 0;
+    } else {
+        for (let i=5; i>=0; i--) {
+            const d = new Date(); d.setMonth(now.getMonth()-i);
+            labels.push(d.toLocaleDateString('en-US',{month:'short'}));
+            let r=0, p=0;
             salesLogs.forEach(log => {
-                const logDate = new Date(log.timestamp);
-                if (logDate.getMonth() === d.getMonth() && logDate.getFullYear() === d.getFullYear()) {
-                    monthRev += log.totals.grandTotal;
-                    monthProf += log.totals.netProfit;
-                }
+                const ld = new Date(log.timestamp);
+                if (ld.getMonth()===d.getMonth() && ld.getFullYear()===d.getFullYear()) { r+=log.totals.grandTotal; p+=log.totals.netProfit; }
             });
-            
-            revenueData.push(monthRev);
-            profitData.push(monthProf);
+            revenue.push(r); profit.push(p);
         }
     }
-    
+
     activeChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: labels,
+            labels,
             datasets: [
-                {
-                    label: 'Revenue (LKR)',
-                    data: revenueData,
-                    backgroundColor: '#0f2942',
-                    borderColor: '#0f2942',
-                    borderWidth: 1,
-                    borderRadius: 4
-                },
-                {
-                    label: 'Net Profit (LKR)',
-                    data: profitData,
-                    backgroundColor: '#9e1a1a',
-                    borderColor: '#9e1a1a',
-                    borderWidth: 1,
-                    borderRadius: 4
-                }
+                { label:'Revenue (LKR)', data:revenue, backgroundColor:'#0f2942', borderRadius:4 },
+                { label:'Net Profit (LKR)', data:profit, backgroundColor:'#9e1a1a', borderRadius:4 }
             ]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: {
-                        font: {
-                            family: "'Outfit', sans-serif",
-                            weight: '600'
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return 'LKR ' + value.toLocaleString();
-                        }
-                    }
-                }
-            }
+            responsive:true, maintainAspectRatio:false,
+            plugins: { legend:{ position:'top', labels:{ font:{ family:"'Outfit',sans-serif", weight:'600' } } } },
+            scales: { y:{ beginAtZero:true, ticks:{ callback: v => 'LKR '+v.toLocaleString() } } }
         }
     });
 }
 
 // ==========================================
-// DATA BACKUP & RESTORE UTILITIES
+// DATABASE BACKUP & RESTORE
 // ==========================================
-
-// Download Database as JSON Backup
 function exportDatabase() {
-    const dataStr = JSON.stringify({
-        products: products,
-        salesLogs: salesLogs,
-        brands: brands
-    }, null, 2);
-    
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `perera_roofing_backup_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    
-    setTimeout(() => {
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-    }, 0);
-    
-    showToast('Database exported/backed up successfully!');
+    const data = JSON.stringify({ products, salesLogs, brands }, null, 2);
+    downloadBlob(data, `perera_backup_${todayStr()}.json`, 'application/json');
+    showToast('Database backup downloaded!');
 }
 
-// Upload/Restore Database from JSON Backup
 function importDatabase(event) {
     const file = event.target.files[0];
     if (!file) return;
-    
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = e => {
         try {
             const data = JSON.parse(e.target.result);
-            
-            if (data.products && Array.isArray(data.products) && data.salesLogs && Array.isArray(data.salesLogs)) {
-                if (confirm('Are you sure you want to import this database? This will completely overwrite your current products list, brands, and transaction history.')) {
-                    products = data.products;
-                    salesLogs = data.salesLogs;
-                    brands = data.brands || ['Sigiri', 'Rhino'];
-                    
-                    saveProducts();
-                    saveSales();
-                    saveBrands();
-                    
-                    renderBrandControls();
-                    
-                    const activeNav = document.querySelector('.nav-item.active');
-                    const currentTab = activeNav ? activeNav.getAttribute('data-tab') : 'dashboard';
-                    switchTab(currentTab);
-                    
-                    showToast('Database restored successfully from backup!', 'success');
-                }
-            } else {
-                showToast('Import failed. Invalid database file structure.', 'danger');
-            }
-        } catch (err) {
-            showToast('Import failed. Could not parse database file.', 'danger');
-        }
+            if (!Array.isArray(data.products) || !Array.isArray(data.salesLogs)) throw new Error('Invalid');
+            if (!confirm('Overwrite current data with this backup?')) return;
+            products  = data.products;
+            salesLogs = data.salesLogs;
+            brands    = data.brands || ['Sigiri','Rhino'];
+            saveProducts(); saveSales(); saveBrands();
+            renderBrandControls();
+            const tab = document.querySelector('.nav-item.active')?.getAttribute('data-tab') || 'dashboard';
+            switchTab(tab);
+            showToast('Database restored!');
+        } catch { showToast('Invalid backup file!', 'danger'); }
     };
     reader.readAsText(file);
-    
     event.target.value = '';
+}
+
+// ==========================================
+// UTILITY HELPERS
+// ==========================================
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+
+function downloadBlob(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
 }
