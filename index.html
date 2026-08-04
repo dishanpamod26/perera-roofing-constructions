@@ -290,38 +290,6 @@
                                     <label for="se-stock-number">Stock / Lot Number *</label>
                                     <input type="text" id="se-stock-number" required placeholder="e.g., Lot-001 or STK-88">
                                 </div>
-                                <div class="form-row">
-                                    <div class="form-group col-6">
-                                        <label for="se-brand">Brand *</label>
-                                        <select id="se-brand" required></select>
-                                    </div>
-                                    <div class="form-group col-6">
-                                        <label for="se-size">Sheet Size *</label>
-                                        <select id="se-size" required>
-                                            <option value="" disabled selected>-- Select Size --</option>
-                                            <option value="6ft">6 ft</option>
-                                            <option value="8ft">8 ft</option>
-                                            <option value="10ft">10 ft</option>
-                                            <option value="12ft">12 ft</option>
-                                            <option value="4x4">4 × 4 ft</option>
-                                            <option value="custom">Custom / Other</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="form-group" id="se-custom-name-group" style="display:none;">
-                                    <label for="se-custom-name">Custom Size / Name *</label>
-                                    <input type="text" id="se-custom-name" placeholder="e.g., 14ft, Special Cut...">
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group col-6">
-                                        <label for="se-qty">Quantity (Sheets) *</label>
-                                        <input type="number" id="se-qty" required min="1" placeholder="e.g., 150">
-                                    </div>
-                                    <div class="form-group col-6">
-                                        <label for="se-weight">Weight (Tons)</label>
-                                        <input type="number" id="se-weight" min="0" step="0.001" placeholder="e.g., 2.5">
-                                    </div>
-                                </div>
                                 <div class="form-group">
                                     <label for="se-total-cost">Total Cost Paid (LKR) *</label>
                                     <div class="price-input-wrapper">
@@ -334,12 +302,27 @@
                                     <label for="se-note">Note (Optional)</label>
                                     <input type="text" id="se-note" placeholder="e.g., Lot No. 3, Supplier: ABC...">
                                 </div>
+
+                                <div style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 15px;">
+                                    <h4 style="font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                                        <span>Sheets in this Lot *</span>
+                                    </h4>
+                                    
+                                    <div id="se-items-container" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px;">
+                                        <!-- Dynamic rows added via JS -->
+                                    </div>
+                                    
+                                    <button type="button" id="add-se-item-btn" class="btn-secondary" style="width: 100%; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px;">
+                                        <i data-lucide="plus" style="width: 16px; height: 16px;"></i> Add Sheet Item Row
+                                    </button>
+                                </div>
+
                                 <div class="stock-entry-preview" id="se-preview">
                                     <div class="se-preview-row">
-                                        <span>Sheet Name:</span><strong id="se-prev-name">—</strong>
+                                        <span>Total Items:</span><strong id="se-prev-items">0 types</strong>
                                     </div>
                                     <div class="se-preview-row">
-                                        <span>Qty to Add:</span><strong id="se-prev-qty">0 sheets</strong>
+                                        <span>Total Qty:</span><strong id="se-prev-qty">0 sheets</strong>
                                     </div>
                                     <div class="se-preview-row">
                                         <span>Stock Number:</span><strong id="se-prev-stock-num">—</strong>
@@ -349,42 +332,27 @@
                                     </div>
                                 </div>
                                 <button type="submit" class="btn-primary" style="width:100%;margin-top:8px;">
-                                    <i data-lucide="save"></i> Add to Stock &amp; Log
+                                    <i data-lucide="save"></i> Log Stock Lot (Pending)
                                 </button>
                             </form>
                         </div>
 
-                        <!-- Right: Stock Purchase History -->
-                        <div class="stock-history-card">
+                        <!-- Right: Stock Lots & Purchase History -->
+                        <div class="stock-history-card" style="flex-grow: 2;">
                             <div class="card-header" style="flex-wrap:wrap;gap:8px;">
-                                <h3><i data-lucide="clock" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i>Stock Purchase History</h3>
+                                <h3><i data-lucide="clock" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i>Stock Lots History</h3>
                                 <div style="display:flex;gap:8px;flex-wrap:wrap;">
                                     <div class="search-bar" style="min-width:180px;">
                                         <i data-lucide="search"></i>
-                                        <input type="text" id="stock-history-search" placeholder="Search...">
+                                        <input type="text" id="stock-history-search" placeholder="Search lots...">
                                     </div>
                                     <button id="download-stock-csv-btn" class="btn-secondary" style="padding:8px 14px;font-size:13px;">
                                         <i data-lucide="file-spreadsheet"></i> Export CSV
                                     </button>
                                 </div>
                             </div>
-                            <div class="table-container">
-                                <table class="data-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Date</th>
-                                            <th>Stock Number</th>
-                                            <th>Brand</th>
-                                            <th>Size</th>
-                                            <th class="text-right">Qty Added</th>
-                                            <th class="text-right">Total Cost Paid</th>
-                                            <th>Note</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="stock-history-body">
-                                        <tr><td colspan="7" class="text-center" style="padding:32px;color:var(--text-muted);">No stock entries yet.</td></tr>
-                                    </tbody>
-                                </table>
+                            <div class="stock-lots-grid" id="stock-lots-grid">
+                                <!-- Dynamic stock lot cards injected here -->
                             </div>
                         </div>
                     </div>
@@ -559,6 +527,41 @@
                     <button type="submit" class="btn-primary" id="save-product-btn">Save Product</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- ══ MODAL: VIEW STOCK LOT DETAILS ══ -->
+    <div id="stock-lot-modal" class="modal-overlay">
+        <div class="modal-box" style="max-width: 650px;">
+            <div class="modal-header">
+                <h3>Stock Lot Details - <span id="modal-lot-number"></span></h3>
+                <button class="modal-close" id="close-lot-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: var(--text-secondary); background: var(--primary-ultra-light); padding: 10px 14px; border-radius: var(--radius-md);">
+                    <div><strong>Date Logged:</strong> <span id="modal-lot-date"></span></div>
+                    <div><strong>Total Cost Paid:</strong> <strong id="modal-lot-cost" class="text-navy"></strong></div>
+                    <div><strong>Status:</strong> <span id="modal-lot-status-badge"></span></div>
+                </div>
+                <div style="margin-bottom: 16px; font-size: 13px; color: var(--text-secondary); padding: 0 14px;">
+                    <strong>Note:</strong> <span id="modal-lot-note"></span>
+                </div>
+                
+                <form id="lot-prices-form">
+                    <input type="hidden" id="modal-lot-id">
+                    
+                    <h4 style="font-size: 13px; font-weight: 700; color: var(--primary); border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-bottom: 12px;">Items & Pricing Info</h4>
+                    
+                    <div id="modal-lot-items-container" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; max-height: 350px; overflow-y: auto; padding-right: 4px;">
+                        <!-- Dynamic items list -->
+                    </div>
+                    
+                    <div class="modal-footer" id="modal-lot-footer">
+                        <button type="button" class="btn-secondary" id="cancel-lot-btn">Close</button>
+                        <button type="submit" class="btn-primary" id="confirm-lot-prices-btn">Confirm Prices & Update Inventory</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 

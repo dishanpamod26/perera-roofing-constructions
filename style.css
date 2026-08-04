@@ -1922,3 +1922,82 @@ h1, h2, h3, h4, h5, h6 {
         padding: 2px 6px;
     }
 }
+
+/* Stock Lot Cards */
+.stock-lots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+    margin-top: 12px;
+}
+
+.stock-lot-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 12px;
+    position: relative;
+}
+
+.stock-lot-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary);
+}
+
+.stock-lot-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.stock-lot-card-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.stock-lot-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 50px;
+    text-transform: capitalize;
+}
+
+.stock-lot-badge.pending {
+    background-color: rgba(243, 156, 18, 0.1);
+    color: #e67e22;
+    border: 1px solid rgba(243, 156, 18, 0.2);
+}
+
+.stock-lot-badge.completed {
+    background-color: var(--success-ultra-light);
+    color: var(--success);
+    border: 1px solid rgba(46, 204, 113, 0.2);
+}
+
+.stock-lot-card-body {
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.stock-lot-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px dashed var(--border);
+    padding-top: 10px;
+    margin-top: 4px;
+    font-size: 12px;
+}

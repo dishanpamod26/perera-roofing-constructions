@@ -239,21 +239,20 @@ function setupEventListeners() {
 
     // ── STOCK MANAGEMENT FORM ──────────────────────────────
     const seForm        = document.getElementById('stock-entry-form');
-    const seSizeSelect  = document.getElementById('se-size');
-    const seCustomGroup = document.getElementById('se-custom-name-group');
-    const seCustomName  = document.getElementById('se-custom-name');
-    const seQty         = document.getElementById('se-qty');
     const seStockNum    = document.getElementById('se-stock-number');
     const seTotalCost   = document.getElementById('se-total-cost');
+    const addSeItemBtn  = document.getElementById('add-se-item-btn');
 
-    seSizeSelect.addEventListener('change', () => {
-        seCustomGroup.style.display = seSizeSelect.value === 'custom' ? 'block' : 'none';
-        seCustomName.required = seSizeSelect.value === 'custom';
-        updateStockEntryPreview();
-    });
-    seQty.addEventListener('input', () => { updateStockEntryPreview(); });
-    seStockNum.addEventListener('input', () => { updateStockEntryPreview(); });
-    seTotalCost.addEventListener('input', () => { updateStockEntryPreview(); });
+    if (addSeItemBtn) {
+        addSeItemBtn.addEventListener('click', () => addSeItemRow());
+    }
+
+    if (seStockNum) {
+        seStockNum.addEventListener('input', updateStockEntryPreview);
+    }
+    if (seTotalCost) {
+        seTotalCost.addEventListener('input', updateStockEntryPreview);
+    }
 
     seForm.addEventListener('submit', e => {
         e.preventDefault();
@@ -261,6 +260,17 @@ function setupEventListeners() {
     });
 
     document.getElementById('stock-history-search').addEventListener('input', renderStockHistory);
+
+    // Initial default row in stock management form
+    const seItemsContainer = document.getElementById('se-items-container');
+    if (seItemsContainer && seItemsContainer.children.length === 0) {
+        addSeItemRow();
+    }
+
+    // Modal close and confirm pricing handlers
+    document.getElementById('close-lot-modal').addEventListener('click', closeStockLotModal);
+    document.getElementById('cancel-lot-btn').addEventListener('click', closeStockLotModal);
+    document.getElementById('lot-prices-form').addEventListener('submit', confirmStockLotPrices);
 
     // Sales log controls
     document.getElementById('sales-search').addEventListener('input', renderSalesLogs);
@@ -288,150 +298,430 @@ function setupEventListeners() {
 // ============================================================
 // STOCK ENTRY FORM PREVIEW
 // ============================================================
-function updateStockEntryPreview() {
-    const brand    = document.getElementById('se-brand').value || '—';
-    const sizeVal  = document.getElementById('se-size').value;
-    const sizeTxt  = sizeVal === 'custom' ? (document.getElementById('se-custom-name').value || '—') : sizeLabel(sizeVal);
-    const qty      = parseInt(document.getElementById('se-qty').value) || 0;
-    const stockNum = document.getElementById('se-stock-number').value.trim() || '—';
-    const total    = parseFloat(document.getElementById('se-total-cost').value) || 0;
+// ============================================================
+// DYNAMIC ROW MANAGEMENT FOR STOCK LOT
+// ============================================================
+function addSeItemRow(brand='', size='', customName='', qty='', weight='') {
+    const container = document.getElementById('se-items-container');
+    if (!container) return;
+    
+    const rowId = 'se_row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+    const row = document.createElement('div');
+    row.className = 'se-item-row';
+    row.id = rowId;
+    row.style.cssText = 'display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 10px; background: var(--bg-body);';
+    
+    // Brand options
+    const brandOpts = brands.map(b => `<option value="${b}" ${b===brand?'selected':''}>${b}</option>`).join('') + `<option value="Other" ${brand==='Other'?'selected':''}>Other</option>`;
+    
+    row.innerHTML = `
+        <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 0;">
+            <label style="font-size: 11px; margin-bottom: 4px;">Brand *</label>
+            <select class="se-item-brand" required style="height: 38px; font-size: 13px;">
+                <option value="" disabled ${!brand?'selected':''}>-- Brand --</option>
+                ${brandOpts}
+            </select>
+        </div>
+        <div class="form-group" style="flex: 1; min-width: 110px; margin-bottom: 0;">
+            <label style="font-size: 11px; margin-bottom: 4px;">Size *</label>
+            <select class="se-item-size" required style="height: 38px; font-size: 13px;">
+                <option value="" disabled ${!size?'selected':''}>-- Size --</option>
+                <option value="6ft" ${size==='6ft'?'selected':''}>6 ft</option>
+                <option value="8ft" ${size==='8ft'?'selected':''}>8 ft</option>
+                <option value="10ft" ${size==='10ft'?'selected':''}>10 ft</option>
+                <option value="12ft" ${size==='12ft'?'selected':''}>12 ft</option>
+                <option value="4x4" ${size==='4x4'?'selected':''}>4 × 4 ft</option>
+                <option value="custom" ${size==='custom'?'selected':''}>Custom / Other</option>
+            </select>
+        </div>
+        <div class="form-group se-item-custom-group" style="display: ${size==='custom'?'block':'none'}; flex: 1.5; min-width: 140px; margin-bottom: 0;">
+            <label style="font-size: 11px; margin-bottom: 4px;">Custom Name *</label>
+            <input type="text" class="se-item-custom-name" value="${customName}" placeholder="e.g. Ridge Cap, 14ft..." style="height: 38px; font-size: 13px;">
+        </div>
+        <div class="form-group" style="width: 70px; margin-bottom: 0;">
+            <label style="font-size: 11px; margin-bottom: 4px;">Qty *</label>
+            <input type="number" class="se-item-qty" value="${qty}" required min="1" placeholder="Qty" style="height: 38px; font-size: 13px;">
+        </div>
+        <div class="form-group" style="width: 70px; margin-bottom: 0;">
+            <label style="font-size: 11px; margin-bottom: 4px;">Weight (T)</label>
+            <input type="number" class="se-item-weight" value="${weight}" min="0" step="0.001" placeholder="Ton" style="height: 38px; font-size: 13px;">
+        </div>
+        <button type="button" class="btn-remove-row" style="height: 38px; padding: 0 10px; border-radius: var(--radius-md); border: 1px solid var(--border); background: transparent; color: var(--danger); cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Remove Row">
+            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+        </button>
+    `;
+    
+    container.appendChild(row);
+    lucide.createIcons();
+    
+    // Event listeners
+    const sizeSelect = row.querySelector('.se-item-size');
+    const customGroup = row.querySelector('.se-item-custom-group');
+    const customInput = row.querySelector('.se-item-custom-name');
+    
+    sizeSelect.addEventListener('change', () => {
+        const isCustom = sizeSelect.value === 'custom';
+        customGroup.style.display = isCustom ? 'block' : 'none';
+        customInput.required = isCustom;
+        updateStockEntryPreview();
+    });
+    
+    row.querySelector('.se-item-brand').addEventListener('change', updateStockEntryPreview);
+    row.querySelector('.se-item-qty').addEventListener('input', updateStockEntryPreview);
+    row.querySelector('.se-item-weight').addEventListener('input', updateStockEntryPreview);
+    if (customInput) customInput.addEventListener('input', updateStockEntryPreview);
+    
+    row.querySelector('.btn-remove-row').addEventListener('click', () => {
+        if (container.querySelectorAll('.se-item-row').length > 1) {
+            row.remove();
+            updateStockEntryPreview();
+        } else {
+            showToast('At least one item row is required!', 'warning');
+        }
+    });
+    
+    updateStockEntryPreview();
+}
 
-    document.getElementById('se-prev-name').textContent  = `${brand} ${sizeTxt}`;
-    document.getElementById('se-prev-qty').textContent   = `${qty} sheets`;
+function updateStockEntryPreview() {
+    const container = document.getElementById('se-items-container');
+    const stockNum = document.getElementById('se-stock-number').value.trim() || '—';
+    const totalCost = parseFloat(document.getElementById('se-total-cost').value) || 0;
+    
+    let totalQty = 0;
+    let totalItems = 0;
+    
+    if (container) {
+        const rows = container.querySelectorAll('.se-item-row');
+        totalItems = rows.length;
+        rows.forEach(row => {
+            const qty = parseInt(row.querySelector('.se-item-qty').value) || 0;
+            totalQty += qty;
+        });
+    }
+    
+    document.getElementById('se-prev-items').textContent = `${totalItems} size${totalItems===1?'':'s'}`;
+    document.getElementById('se-prev-qty').textContent = `${totalQty} sheet${totalQty===1?'':'s'}`;
     document.getElementById('se-prev-stock-num').textContent = stockNum;
-    document.getElementById('se-prev-total').textContent = `LKR ${fmt(total)}`;
+    document.getElementById('se-prev-total').textContent = `LKR ${fmt(totalCost)}`;
 }
 
 // ============================================================
-// SAVE STOCK ENTRY → auto-create/update inventory
+// SAVE STOCK ENTRY → log pending stock lot
 // ============================================================
 function saveStockEntry() {
-    const brand       = document.getElementById('se-brand').value;
-    const sizeVal     = document.getElementById('se-size').value;
-    const customName  = document.getElementById('se-custom-name').value.trim();
-    const qty         = parseInt(document.getElementById('se-qty').value) || 0;
-    const weight      = parseFloat(document.getElementById('se-weight').value) || 0;
     const stockNumber = document.getElementById('se-stock-number').value.trim();
     const totalCost   = parseFloat(document.getElementById('se-total-cost').value) || 0;
     const note        = document.getElementById('se-note').value.trim();
-
+    const container   = document.getElementById('se-items-container');
+    
     if (!stockNumber) { showToast('Please enter a Stock / Lot Number!', 'warning'); return; }
-    if (!brand)       { showToast('Please select a brand!', 'warning'); return; }
-    if (!sizeVal)     { showToast('Please select a size!', 'warning'); return; }
-    if (sizeVal === 'custom' && !customName) { showToast('Please enter the custom size name!', 'warning'); return; }
-    if (qty <= 0)     { showToast('Quantity must be greater than 0!', 'warning'); return; }
     if (totalCost <= 0) { showToast('Please enter a valid total cost paid!', 'warning'); return; }
-
-    const finalSize = sizeVal === 'custom' ? customName : sizeVal;
-
-    // Find or create inventory product for this brand+size
-    let prod = products.find(p => p.brand === brand && p.size === finalSize);
-    if (prod) {
-        // Update stock only — do NOT override buying/selling price
-        prod.stock += qty;
-    } else {
-        // Product not found, prompt for buying and selling prices
+    if (!container) return;
+    
+    const rows = container.querySelectorAll('.se-item-row');
+    if (rows.length === 0) { showToast('Please add at least one item row!', 'warning'); return; }
+    
+    const items = [];
+    let isValid = true;
+    
+    rows.forEach((row, index) => {
+        const brand = row.querySelector('.se-item-brand').value;
+        const sizeVal = row.querySelector('.se-item-size').value;
+        const customName = row.querySelector('.se-item-custom-name').value.trim();
+        const qty = parseInt(row.querySelector('.se-item-qty').value) || 0;
+        const weight = parseFloat(row.querySelector('.se-item-weight').value) || 0;
+        
+        if (!brand) { showToast(`Please select a brand for row ${index+1}!`, 'warning'); isValid = false; return; }
+        if (!sizeVal) { showToast(`Please select a size for row ${index+1}!`, 'warning'); isValid = false; return; }
+        if (sizeVal === 'custom' && !customName) { showToast(`Please enter custom name for row ${index+1}!`, 'warning'); isValid = false; return; }
+        if (qty <= 0) { showToast(`Quantity must be greater than 0 for row ${index+1}!`, 'warning'); isValid = false; return; }
+        
+        const finalSize = sizeVal === 'custom' ? customName : sizeVal;
         const displayLabel = sizeVal === 'custom' ? customName : sizeLabel(sizeVal);
-        const buyStr = prompt(`Product "${brand} ${displayLabel}" not found in inventory.\nPlease enter its Buying Price (Cost) per sheet (LKR):`, "0");
-        if (buyStr === null) return; // user cancelled
-        const sellStr = prompt(`Please enter its Selling Price per sheet (LKR):`, "0");
-        if (sellStr === null) return; // user cancelled
-
-        const buyingPrice = parseFloat(buyStr) || 0;
-        const sellingPrice = parseFloat(sellStr) || 0;
-
-        prod = {
-            id:           'prod_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-            name:         sizeVal === 'custom' ? customName : sizeLabel(sizeVal) + ' Roofing Sheet',
-            size:         finalSize,
-            brand:        brand,
-            buyingPrice:  buyingPrice,
-            sellingPrice: sellingPrice,
-            stock:        qty,
-            alertLevel:   10,
-        };
-        products.push(prod);
-    }
-    saveProducts();
-
-    // Log the purchase
+        
+        items.push({
+            id: 'item_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+            brand,
+            size: finalSize,
+            sizeLabel: displayLabel,
+            qty,
+            weight,
+            buyingPrice: 0,
+            sellingPrice: 0
+        });
+    });
+    
+    if (!isValid) return;
+    
+    // Log the purchase as PENDING.
     stockLogs.unshift({
-        id:           'SL-' + Date.now(),
-        timestamp:    new Date().toISOString(),
+        id: 'SL-' + Date.now(),
+        timestamp: new Date().toISOString(),
         stockNumber,
-        brand,
-        size:         finalSize,
-        sizeLabel:    sizeVal === 'custom' ? customName : sizeLabel(sizeVal),
-        qty,
-        weight,
         totalCost,
         note,
-        productId:    prod.id,
+        status: 'pending',
+        items
     });
     saveStockLogs();
-
+    
     // Reset form
     document.getElementById('stock-entry-form').reset();
-    document.getElementById('se-custom-name-group').style.display = 'none';
+    container.innerHTML = '';
+    addSeItemRow(); // Add one default row
+    
     document.getElementById('se-total-cost').value = '';
-    document.getElementById('se-prev-name').textContent  = '—';
-    document.getElementById('se-prev-qty').textContent   = '0 sheets';
+    document.getElementById('se-prev-items').textContent = '0 types';
+    document.getElementById('se-prev-qty').textContent = '0 sheets';
     document.getElementById('se-prev-stock-num').textContent = '—';
     document.getElementById('se-prev-total').textContent = 'LKR 0.00';
-    renderBrandControls();
-
-    renderStockHistory();
-    renderInventory();
+    
+    renderStockHistory(); // Renders the lot card list
     renderDashboard();
-
-    showToast(`Stock added! ${brand} ${sizeLabel(finalSize)} +${qty} sheets logged under ${stockNumber}.`, 'success');
+    
+    showToast(`Stock lot logged! Lot ${stockNumber} is saved as PENDING. Click it in history to set buying/selling prices and update inventory.`, 'success');
 }
 
 // ============================================================
-// STOCK HISTORY TABLE
+// STOCK LOT CARD HISTORY RENDER
 // ============================================================
 function renderStockHistory() {
     const search = document.getElementById('stock-history-search').value.toLowerCase();
-    const tbody  = document.getElementById('stock-history-body');
-    tbody.innerHTML = '';
-
+    const grid = document.getElementById('stock-lots-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    
     const filtered = stockLogs.filter(l =>
-        l.brand.toLowerCase().includes(search) ||
-        l.sizeLabel.toLowerCase().includes(search) ||
         (l.stockNumber || '').toLowerCase().includes(search) ||
-        (l.note || '').toLowerCase().includes(search)
+        (l.note || '').toLowerCase().includes(search) ||
+        l.items.some(item => 
+            item.brand.toLowerCase().includes(search) ||
+            item.sizeLabel.toLowerCase().includes(search)
+        )
     );
-
+    
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center" style="padding:32px;color:var(--text-muted);">No stock entries found.</td></tr>`;
+        grid.innerHTML = `<div class="empty-cart-placeholder" style="grid-column: 1/-1;"><i data-lucide="clock-loader-4"></i><p>No stock entries found.</p></div>`;
+        lucide.createIcons();
         return;
     }
-
+    
     filtered.forEach(l => {
-        const d  = new Date(l.timestamp);
-        const ds = d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td><span class="text-muted" style="font-size:12px;">${ds}</span></td>
-            <td><strong>${l.stockNumber || '—'}</strong></td>
-            <td><span class="badge badge-secondary">${l.brand}</span></td>
-            <td><strong>${l.sizeLabel}</strong></td>
-            <td class="text-right"><strong>+${l.qty}</strong></td>
-            <td class="text-right" style="color:var(--secondary);font-weight:700;">LKR ${fmt(l.totalCost)}</td>
-            <td style="font-size:12px;color:var(--text-muted);">${l.note || '—'}</td>`;
-        tbody.appendChild(tr);
+        const d = new Date(l.timestamp);
+        const ds = d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+        
+        let totalSheets = 0;
+        const brandSet = new Set();
+        l.items.forEach(i => {
+            totalSheets += i.qty;
+            brandSet.add(i.brand);
+        });
+        const brandsStr = Array.from(brandSet).join(', ');
+        
+        const card = document.createElement('div');
+        card.className = 'stock-lot-card';
+        
+        const statusBadge = l.status === 'pending' 
+            ? `<span class="stock-lot-badge pending"><i data-lucide="clock" style="width:10px;height:10px;vertical-align:middle;margin-right:2px;"></i>Pending Prices</span>` 
+            : `<span class="stock-lot-badge completed"><i data-lucide="check-circle-2" style="width:10px;height:10px;vertical-align:middle;margin-right:2px;"></i>Completed</span>`;
+            
+        card.innerHTML = `
+            <div class="stock-lot-card-header">
+                <span class="stock-lot-card-title">${l.stockNumber}</span>
+                ${statusBadge}
+            </div>
+            <div class="stock-lot-card-body">
+                <div><span class="text-muted">Brands:</span> <strong>${brandsStr || '—'}</strong></div>
+                <div><span class="text-muted">Total Qty:</span> <strong>${totalSheets} sheets</strong></div>
+                <div><span class="text-muted">Total Cost Paid:</span> <strong class="text-navy">LKR ${fmt(l.totalCost)}</strong></div>
+                ${l.note ? `<div style="font-style: italic; font-size:11px; margin-top: 4px; border-left:2px solid var(--border); padding-left: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">"${l.note}"</div>` : ''}
+            </div>
+            <div class="stock-lot-card-footer">
+                <span>Logged on: ${ds}</span>
+                <span style="color: var(--primary); font-weight:700; font-size:11px; display:flex; align-items:center; gap:2px;">
+                    ${l.status === 'pending' ? 'Enter Prices' : 'View Details'} <i data-lucide="chevron-right" style="width:12px;height:12px;"></i>
+                </span>
+            </div>
+        `;
+        
+        card.addEventListener('click', () => openStockLotDetailsModal(l.id));
+        grid.appendChild(card);
     });
+    
+    lucide.createIcons();
 }
 
 function downloadStockCSV() {
     if (stockLogs.length === 0) { showToast('No stock logs to export!', 'warning'); return; }
-    let csv = '\uFEFFDate,Stock Number,Brand,Size,Qty Added,Total Cost Paid (LKR),Weight (Tons),Note\r\n';
+    let csv = '\uFEFFDate,Stock Number,Status,Brand,Size,Qty Added,Buying Price (LKR),Selling Price (LKR),Total Cost Paid (LKR),Weight (Tons),Note\r\n';
     stockLogs.forEach(l => {
         const d = new Date(l.timestamp);
-        csv += `"${d.toLocaleDateString('en-US')} ${d.toLocaleTimeString('en-US')}","${l.stockNumber||'—'}","${l.brand}","${l.sizeLabel}",${l.qty},${l.totalCost},${l.weight||0},"${(l.note||'').replace(/"/g,'""')}"\r\n`;
+        const dateStr = `${d.toLocaleDateString('en-US')} ${d.toLocaleTimeString('en-US')}`;
+        l.items.forEach(item => {
+            csv += `"${dateStr}","${l.stockNumber||'—'}","${l.status}","${item.brand}","${item.sizeLabel}",${item.qty},${item.buyingPrice||0},${item.sellingPrice||0},${l.totalCost},${item.weight||0},"${(l.note||'').replace(/"/g,'""')}"\r\n`;
+        });
     });
     downloadBlob(csv, `perera_stock_log_${todayStr()}.csv`, 'text/csv');
     showToast('Stock log CSV downloaded!');
+}
+
+// ============================================================
+// MODAL: STOCK LOT PRICING & CONFIRMATION
+// ============================================================
+function openStockLotDetailsModal(lotId) {
+    const lot = stockLogs.find(l => l.id === lotId);
+    if (!lot) return;
+    
+    document.getElementById('modal-lot-id').value = lot.id;
+    document.getElementById('modal-lot-number').textContent = lot.stockNumber;
+    
+    const d = new Date(lot.timestamp);
+    document.getElementById('modal-lot-date').textContent = d.toLocaleString('en-US', { year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
+    document.getElementById('modal-lot-cost').textContent = `LKR ${fmt(lot.totalCost)}`;
+    document.getElementById('modal-lot-note').textContent = lot.note || '—';
+    
+    const badge = document.getElementById('modal-lot-status-badge');
+    badge.className = `stock-lot-badge ${lot.status}`;
+    badge.textContent = lot.status === 'pending' ? 'Pending Prices' : 'Completed';
+    
+    const container = document.getElementById('modal-lot-items-container');
+    container.innerHTML = '';
+    
+    lot.items.forEach((item, idx) => {
+        const itemRow = document.createElement('div');
+        itemRow.style.cssText = 'padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card); display: flex; flex-direction: column; gap: 8px;';
+        
+        const isPending = lot.status === 'pending';
+        let inputsHtml = '';
+        
+        if (isPending) {
+            inputsHtml = `
+                <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px;">
+                    <div class="form-group" style="flex: 1; min-width: 140px; margin-bottom: 0;">
+                        <label style="font-size: 11px; margin-bottom: 4px; display: block; font-weight:600;">Buying Price per Sheet *</label>
+                        <div class="price-input-wrapper">
+                            <span class="currency-label" style="padding: 4px 8px; font-size:12px;">LKR</span>
+                            <input type="number" class="item-modal-buy-price" required min="0" step="0.01" value="${item.buyingPrice || ''}" placeholder="0.00" style="height: 34px; font-size: 13px; padding-left: 45px; width: 100%; border: 1px solid var(--border); border-radius: var(--radius-md);">
+                        </div>
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 140px; margin-bottom: 0;">
+                        <label style="font-size: 11px; margin-bottom: 4px; display: block; font-weight:600;">Selling Price per Sheet *</label>
+                        <div class="price-input-wrapper">
+                            <span class="currency-label" style="padding: 4px 8px; font-size:12px;">LKR</span>
+                            <input type="number" class="item-modal-sell-price" required min="0" step="0.01" value="${item.sellingPrice || ''}" placeholder="0.00" style="height: 34px; font-size: 13px; padding-left: 45px; width: 100%; border: 1px solid var(--border); border-radius: var(--radius-md);">
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            inputsHtml = `
+                <div style="display: flex; gap: 20px; margin-top: 4px; font-size: 12px; color: var(--text-secondary); background: var(--bg-body); padding: 8px 12px; border-radius: var(--radius-md);">
+                    <div><span>Buying Price:</span> <strong style="color: var(--primary);">LKR ${fmt(item.buyingPrice)}</strong></div>
+                    <div><span>Selling Price:</span> <strong style="color: var(--primary);">LKR ${fmt(item.sellingPrice)}</strong></div>
+                    <div><span>Markup:</span> <strong style="color: var(--success);">${(item.buyingPrice > 0 ? (item.sellingPrice - item.buyingPrice)/item.buyingPrice * 100 : 0).toFixed(1)}%</strong></div>
+                </div>
+            `;
+        }
+        
+        itemRow.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--border); padding-bottom: 6px;">
+                <span style="font-weight: 700; font-size: 13.5px; color: var(--primary);">${item.brand} ${item.sizeLabel}</span>
+                <span style="font-size: 12px; color: var(--text-secondary);">Qty: <strong>${item.qty} sheets</strong> ${item.weight ? `&bull; Weight: <strong>${item.weight} T</strong>` : ''}</span>
+            </div>
+            ${inputsHtml}
+        `;
+        container.appendChild(itemRow);
+    });
+    
+    const footer = document.getElementById('modal-lot-footer');
+    if (lot.status === 'pending') {
+        footer.innerHTML = `
+            <button type="button" class="btn-secondary" id="close-lot-btn-2">Close</button>
+            <button type="submit" class="btn-primary" id="confirm-lot-prices-btn"><i data-lucide="check-circle" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i> Confirm Prices & Update Inventory</button>
+        `;
+        document.getElementById('close-lot-btn-2').addEventListener('click', closeStockLotModal);
+    } else {
+        footer.innerHTML = `
+            <button type="button" class="btn-secondary" id="close-lot-btn-2" style="width: 100%;">Close</button>
+        `;
+        document.getElementById('close-lot-btn-2').addEventListener('click', closeStockLotModal);
+    }
+    
+    lucide.createIcons();
+    document.getElementById('stock-lot-modal').classList.add('active');
+}
+
+function closeStockLotModal() {
+    document.getElementById('stock-lot-modal').classList.remove('active');
+}
+
+function confirmStockLotPrices(e) {
+    e.preventDefault();
+    const lotId = document.getElementById('modal-lot-id').value;
+    const lot = stockLogs.find(l => l.id === lotId);
+    if (!lot || lot.status !== 'pending') return;
+    
+    const container = document.getElementById('modal-lot-items-container');
+    const rows = container.children;
+    
+    let isValid = true;
+    const updatedPrices = [];
+    
+    for (let idx = 0; idx < lot.items.length; idx++) {
+        const row = rows[idx];
+        const buyInput = row.querySelector('.item-modal-buy-price');
+        const sellInput = row.querySelector('.item-modal-sell-price');
+        
+        const buyingPrice = parseFloat(buyInput.value) || 0;
+        const sellingPrice = parseFloat(sellInput.value) || 0;
+        
+        if (buyingPrice <= 0) { showToast(`Please enter a valid buying price for row ${idx+1}!`, 'warning'); isValid = false; break; }
+        if (sellingPrice <= 0) { showToast(`Please enter a valid selling price for row ${idx+1}!`, 'warning'); isValid = false; break; }
+        
+        updatedPrices.push({ index: idx, buyingPrice, sellingPrice });
+    }
+    
+    if (!isValid) return;
+    
+    updatedPrices.forEach(up => {
+        const item = lot.items[up.index];
+        item.buyingPrice = up.buyingPrice;
+        item.sellingPrice = up.sellingPrice;
+        
+        let prod = products.find(p => p.brand === item.brand && p.size === item.size);
+        if (prod) {
+            prod.stock += item.qty;
+            prod.buyingPrice = item.buyingPrice;
+            prod.sellingPrice = item.sellingPrice;
+        } else {
+            prod = {
+                id:           'prod_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                name:         item.sizeLabel + ' Roofing Sheet',
+                size:         item.size,
+                brand:        item.brand,
+                buyingPrice:  item.buyingPrice,
+                sellingPrice: item.sellingPrice,
+                stock:        item.qty,
+                alertLevel:   10,
+            };
+            products.push(prod);
+        }
+    });
+    
+    lot.status = 'completed';
+    
+    saveProducts();
+    saveStockLogs();
+    
+    closeStockLotModal();
+    
+    renderStockHistory();
+    renderInventory();
+    renderCatalog();
+    renderDashboard();
+    
+    showToast(`Stock lot ${lot.stockNumber} prices confirmed and inventory successfully updated!`, 'success');
 }
 
 // ============================================================
