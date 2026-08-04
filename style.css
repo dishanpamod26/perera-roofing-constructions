@@ -282,7 +282,7 @@ h1, h2, h3, h4, h5, h6 {
     flex-direction: column;
     gap: 28px;
     animation: fadeIn 0.3s ease;
-    height: 100%;
+    min-height: 0;
 }
 
 .tab-pane.active {
@@ -1823,21 +1823,41 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @media (max-width: 768px) {
+    html {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    body {
+        overflow-y: auto;
+        overflow-x: hidden;
+        height: auto;
+        min-height: 100vh;
+        -webkit-overflow-scrolling: touch;
+    }
+
     .app-container {
         flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+        overflow: visible;
+        overflow-y: visible;
     }
-    
+
     .sidebar {
         width: 100%;
         height: auto;
         padding: 16px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
     }
-    
+
     .sidebar-header {
         margin-bottom: 16px;
         padding-bottom: 12px;
     }
-    
+
     .sidebar-menu {
         flex-direction: row;
         overflow-x: auto;
@@ -1846,44 +1866,103 @@ h1, h2, h3, h4, h5, h6 {
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
     }
-    
+
     .sidebar-menu::-webkit-scrollbar {
         display: none;
     }
-    
+
     .nav-item {
         padding: 8px 14px;
         font-size: 13px;
         white-space: nowrap;
     }
-    
+
     .sidebar-footer {
         display: none;
     }
-    
+
     .content-header {
         padding: 16px 20px;
     }
-    
+
+    .main-content {
+        overflow: visible;
+        height: auto;
+        flex-grow: 1;
+        min-height: 0;
+    }
+
     .content-body {
         padding: 16px;
+        overflow: visible;
+        flex-grow: 1;
+        height: auto;
+        min-height: 0;
+        padding-bottom: 40px;
     }
-    
+
+    .tab-pane {
+        height: auto;
+        min-height: 0;
+        overflow: visible;
+    }
+
+    .tab-pane.active {
+        height: auto;
+        overflow: visible;
+    }
+
     .kpi-grid {
         grid-template-columns: 1fr 1fr;
         gap: 12px;
     }
-    
+
     .calculator-grid {
         display: flex;
-        flex-direction: column-reverse; /* Put cart on top for easier phone usage */
-        height: auto;
+        flex-direction: column-reverse;
+        height: auto !important;
+        max-height: none !important;
         gap: 16px;
+        overflow: visible;
     }
-    
+
     .catalog-pane, .quotation-panel {
-        max-height: 500px; /* Limit height to prevent infinite scrolling */
+        max-height: none;
         height: auto;
+        overflow: visible;
+    }
+
+    .catalog-cards-grid {
+        max-height: 400px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .quotation-items-list {
+        max-height: 300px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .stock-mgmt-layout {
+        flex-direction: column !important;
+        gap: 20px;
+    }
+
+    .stock-form-card,
+    .stock-history-card {
+        width: 100% !important;
+        flex: none !important;
+        height: auto !important;
+        max-height: none !important;
+    }
+
+    .stock-lots-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-row {
+        grid-template-columns: 1fr;
     }
 }
 
